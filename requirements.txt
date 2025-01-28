@@ -2,3 +2,5 @@ flet==0.24.*
 flet_toast==0.3.1
 requests==2.32.3
 gitpython==3.1.*
+pynpm==0.2.* 
+scp==0.15.*

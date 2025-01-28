@@ -7,6 +7,9 @@ import uploadImgur
 import git
 import shutil
 import config
+import pynpm as npm
+import paramiko
+from connection import MySFTPClient
 
 output = os.popen(f"pwd").read()
 shutil.rmtree(f'{output[:-1]}/LembioWebsite', ignore_errors=True)
@@ -16,6 +19,8 @@ git.Git(output).clone(f'https://{config.secret_token}@github.com/LEM-Bio/LembioW
 paginaPath = f'{output[:-1]}/LembioWebsite'
 repo = git.Repo(paginaPath)
 repo.git.init()
+repo.config_writer().set_value("user", "name", "mousedesvio").release()
+repo.config_writer().set_value("user", "email", "redbrickcar2@gmail.com").release()
 repo.git.remote("set-url", "origin", f"https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git")
 
 #Noticias
@@ -91,7 +96,12 @@ def main(page: ft.Page):
             repo.git.commit("-m", "Change news")
             repo.git.push("-u", "origin", "main")
         except:
-            print('erro')
+            flet_toast.error(
+                page=page,
+                message="Erro ao conectar no github",
+                position=flet_toast.Position.TOP_LEFT,
+                duration=3
+            )
         
         if closeDiag:
             page.close(confirmSave_dialog)
@@ -177,14 +187,6 @@ def main(page: ft.Page):
         password = e.control.parent.content.controls[1].value
         saveYes(e, False)
 
-        commands = f'''
-                    cd {paginaPath} &&
-                    npm install &&
-                    npm run build &&
-                    cd {paginaPath}/build &&
-                    sshpass -p '{password}' scp -r * {user}@172.22.160.222:/usr/share/nginx/html
-                    '''
-
         defaultContent = insertLogin_dialog.content.controls.copy()
         defaultActions = insertLogin_dialog.actions.copy()
         defaultTitle = insertLogin_dialog.title
@@ -193,10 +195,22 @@ def main(page: ft.Page):
         insertLogin_dialog.actions.clear()
         insertLogin_dialog.title = ft.Text("Carregando arquivos...")
         insertLogin_dialog.update()
-        insertLogin_dialog.content = ft.Image(src="loading.gif", width=60, height=60)
+        insertLogin_dialog.content = ft.Container(height = 50, alignment=ft.alignment.center)
+        insertLogin_dialog.content.content = (ft.ProgressRing(width=30, height=30, stroke_width = 3))
+
         insertLogin_dialog.update()
 
-        os.system(commands)
+        pkg = npm.NPMPackage(f'{paginaPath}/package.json')
+        pkg.install()
+        pkg.run_script('build')
+
+        remote_path = "/usr/share/nginx/html"
+
+        transport = paramiko.Transport(('172.22.161.213', 22))
+        transport.connect(username=user, password=password)
+        sftp = MySFTPClient.from_transport(transport)
+        sftp.put_dir(f"{paginaPath}/build", remote_path)
+        sftp.close()
         
         insertLogin_dialog.content = ft.Column(defaultContent.copy(), height=100)
         insertLogin_dialog.actions = defaultActions.copy()
@@ -306,7 +320,6 @@ def main(page: ft.Page):
         page.update()
 
     def drag_will_accept(e):
-        # black border when it's allowed to drop and red when it's not
         e.control.content.color = ft.colors.BLUE_600
         e.control.update()
 
