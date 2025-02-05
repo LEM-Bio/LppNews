@@ -11,12 +11,13 @@ import pynpm as npm
 import paramiko
 from connection import MySFTPClient
 
-output = os.popen(f"pwd").read()
-shutil.rmtree(f'{output[:-1]}/LembioWebsite', ignore_errors=True)
+output = os.getcwd()
+shutil.rmtree(os.path.join(f'{output}', 'LembioWebsite'), ignore_errors=True)
+print(os.path.join(f'{output}', 'LembioWebsite'))
 
 git.Git(output).clone(f'https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git', "--branch=main")
 
-paginaPath = f'{output[:-1]}/LembioWebsite'
+paginaPath = os.path.join(f'{output}', 'LembioWebsite')
 repo = git.Repo(paginaPath)
 repo.git.init()
 repo.config_writer().set_value("user", "name", "mousedesvio").release()
@@ -24,7 +25,7 @@ repo.config_writer().set_value("user", "email", "redbrickcar2@gmail.com").releas
 repo.git.remote("set-url", "origin", f"https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git")
 
 #Noticias
-jsonPath = f'{output[:-1]}/LembioWebsite/src/data/components-mock.json'
+jsonPath = os.path.join(f'{output}', 'LembioWebsite', 'src', 'data', 'components-mock.json')
 
 fNews = open(jsonPath, "r")
 fNews2 = open(jsonPath, "r")
@@ -63,7 +64,7 @@ def main(page: ft.Page):
 
         json.dump(dataNewsOriginal, wNews, indent=2)
         wNews.close()
-        shutil.rmtree(f'{output[:-1]}/LembioWebsite', ignore_errors=True)
+        shutil.rmtree(os.path.join(f'{output[:-1]}', 'LembioWebsite'), ignore_errors=True)
         page.window.destroy()
 
     def handle_no(e):
@@ -200,7 +201,7 @@ def main(page: ft.Page):
 
         insertLogin_dialog.update()
 
-        pkg = npm.NPMPackage(f'{paginaPath}/package.json')
+        pkg = npm.NPMPackage(os.path.join(f'{paginaPath}', 'package.json'), shell=True)
         pkg.install()
         pkg.run_script('build')
 
@@ -209,7 +210,7 @@ def main(page: ft.Page):
         transport = paramiko.Transport(('172.22.161.213', 22))
         transport.connect(username=user, password=password)
         sftp = MySFTPClient.from_transport(transport)
-        sftp.put_dir(f"{paginaPath}/build", remote_path)
+        sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
         sftp.close()
         
         insertLogin_dialog.content = ft.Column(defaultContent.copy(), height=100)
