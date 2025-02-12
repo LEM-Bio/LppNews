@@ -3,6 +3,7 @@ import json
 from copy import deepcopy
 from flet_toast import flet_toast
 import os
+from utils import rmtree
 import uploadImgur
 import git
 import shutil
@@ -12,12 +13,11 @@ import paramiko
 from connection import MySFTPClient
 
 output = os.getcwd()
-shutil.rmtree(os.path.join(f'{output}', 'LembioWebsite'), ignore_errors=True)
-print(os.path.join(f'{output}', 'LembioWebsite'))
+paginaPath = os.path.join(f'{output}', 'LembioWebsite')
+rmtree(paginaPath)
 
 git.Git(output).clone(f'https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git', "--branch=main")
 
-paginaPath = os.path.join(f'{output}', 'LembioWebsite')
 repo = git.Repo(paginaPath)
 repo.git.init()
 repo.config_writer().set_value("user", "name", "mousedesvio").release()
@@ -201,9 +201,10 @@ def main(page: ft.Page):
 
         insertLogin_dialog.update()
 
-        pkg = npm.NPMPackage(os.path.join(f'{paginaPath}', 'package.json'), shell=True)
+        print(f'{paginaPath}{os.sep}package.json')
+        pkg = npm.NPMPackage(f'{paginaPath}{os.sep}package.json')
         pkg.install()
-        pkg.run_script('build')
+        pkg.run_script('build', '--report')
 
         remote_path = "/usr/share/nginx/html"
 
@@ -332,7 +333,6 @@ def main(page: ft.Page):
     imageTextField = ft.TextField()
 
     def on_dialog_result(e: ft.FilePickerResultEvent):
-        print(e.files[0].path)
         path = e.files[0].path
         imgurUrl = uploadImgur.uploadImage(path)
         e.control.parent.parent.controls[0].value = imgurUrl
