@@ -49,7 +49,10 @@ def main(page: ft.Page):
 
     #DEFINIR O QUE APARECE NA TELA
     lv = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=False)
+    pb = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=False)
+    
     botoes = ft.ResponsiveRow()
+    botoesPB = ft.ResponsiveRow()
     
     #FECHAR JSON ANTES DE FECHAR APP
     def handle_window_event(e):
@@ -133,6 +136,14 @@ def main(page: ft.Page):
             lv.controls.append( getNoticia(i, noticia) )
             
         page.update()
+        
+    def pbsReset():
+        pb.controls.clear()
+        for i in range(len(dataNews['publicados'])):
+            publicacao = dataNews['publicados'][i]
+            pb.controls.append( getPubli(i, publicacao) )
+            
+        page.update()
 
     def discardYes(e):
         global dataNews
@@ -140,6 +151,7 @@ def main(page: ft.Page):
         dataNews = deepcopy(dataNewsOriginal)
         
         newsReset()
+        pbsReset()
         
         page.close(confirmDiscard_dialog)
 
@@ -179,6 +191,28 @@ def main(page: ft.Page):
         flet_toast.sucess(
             page=page,
             message="Nova notícia adicionada",
+            position=flet_toast.Position.TOP_LEFT,
+            duration=3
+        )
+        
+    def addPub(e):
+        novaPub = {
+                "title": "",
+                "content": "",
+                "image": {
+                    "url": "",
+                    "alt": ""
+                },
+                "publishDate": "",
+                "link": ""
+            }
+
+        dataNews['publicados'].insert(0, novaPub)
+        pbsReset()
+        
+        flet_toast.sucess(
+            page=page,
+            message="Nova publicação adicionada",
             position=flet_toast.Position.TOP_LEFT,
             duration=3
         )
@@ -268,6 +302,30 @@ def main(page: ft.Page):
                 alignment="CENTER",
             )
     )
+    
+    botoesPB.controls.append(
+        ft.Row(
+                [
+                    ft.IconButton(
+                        icon=ft.icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Adicionar publicação",
+                        on_click=addPub
+                    ),
+                    ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
+                    ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
+                    ft.IconButton(
+                        icon=ft.icons.SEND,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Enviar dados salvos ao servidor",
+                        on_click=sendData,
+                    )
+                ],
+                alignment="CENTER",
+            )
+    )
 
     def changeData(e, column, imageCol=''):
         if imageCol == '':
@@ -282,7 +340,20 @@ def main(page: ft.Page):
                 return
                 
             dataNews['noticias'][index][column][imageCol] = dataToChange
-        
+    
+    def changePub(e, column, imageCol=''):
+        if imageCol == '':
+            index = pb.controls.index(e.control.parent.parent.parent.parent.parent.parent.parent)
+        else:
+            index = pb.controls.index(e.control.parent.parent.parent.parent.parent.parent)
+
+        if len(pb.controls) > index:
+            dataToChange = str(e).split("data='")[1][0:-2]
+            if imageCol == '':
+                dataNews['publicados'][index][column] = dataToChange
+                return
+                
+            dataNews['publicados'][index][column][imageCol] = dataToChange
 
     def removeNot(e):
         noticia = e.control.parent.parent.parent.parent
@@ -294,6 +365,20 @@ def main(page: ft.Page):
         flet_toast.sucess(
             page=page,
             message="Notícia removida",
+            position=flet_toast.Position.TOP_LEFT,
+            duration=3
+        )
+        
+    def removePub(e):
+        publicacao = e.control.parent.parent.parent.parent
+        index = pb.controls.index(publicacao)
+        pb.controls.remove(publicacao)
+        dataNews['publicados'].pop(index)
+
+        pbsReset()
+        flet_toast.sucess(
+            page=page,
+            message="Publicação removida",
             position=flet_toast.Position.TOP_LEFT,
             duration=3
         )
@@ -311,6 +396,29 @@ def main(page: ft.Page):
         # reset border
         e.control.content.color = None
         newsReset()
+
+        flet_toast.sucess(
+            page=page,
+            message="Ordem atualizada",
+            position=flet_toast.Position.TOP_LEFT,
+            duration=3
+        )
+
+        page.update()
+        
+    def dragPB_accept(e):
+        # get draggable (source) control by its ID
+        src = page.get_control(e.src_id)
+        
+        src.content.content, e.control.content = e.control.content, src.content.content
+
+        indexSent = pb.controls.index(src)
+        indexGot = pb.controls.index(e.control.parent)
+        dataNews['publicados'][indexSent], dataNews['publicados'][indexGot] = dataNews['publicados'][indexGot], dataNews['publicados'][indexSent]
+
+        # reset border
+        e.control.content.color = None
+        pbsReset()
 
         flet_toast.sucess(
             page=page,
@@ -343,13 +451,34 @@ def main(page: ft.Page):
         if len(lv.controls) > index:
             dataNews['noticias'][index]['image']['url'] = imgurUrl
         newsReset()
+        
+    def on_dialog_resultPB(e: ft.FilePickerResultEvent):
+        path = e.files[0].path
+        imgurUrl = uploadImgur.uploadImage(path)
+        e.control.parent.parent.controls[0].value = imgurUrl
+        
+        imageTextField.value = imgurUrl
+        index = pb.controls.index(imageTextField.parent.parent.parent.parent.parent.parent)
+
+        if len(pb.controls) > index:
+            dataNews['publicados'][index]['image']['url'] = imgurUrl
+        pbsReset()
 
     def pickFiles(e):
-        file_picker.pick_files(allow_multiple=False)
         global imageTextField
         imageTextField = e.control.parent.controls[0]
+        
+        file_picker.on_result = on_dialog_result
+        file_picker.pick_files(allow_multiple=False)
+        
+    def pickFilesPB(e):
+        global imageTextField
+        imageTextField = e.control.parent.controls[0]
+        
+        file_picker.on_result = on_dialog_resultPB
+        file_picker.pick_files(allow_multiple=False)
 
-    file_picker = ft.FilePicker(on_result=on_dialog_result)
+    file_picker = ft.FilePicker()
     page.overlay.append(file_picker)
     page.update()
 
@@ -361,7 +490,7 @@ def main(page: ft.Page):
                     content=ft.ExpansionTile(
                         title = ft.Row(
                                         [
-                                            ft.Text(f"Noticia {i}", text_align=ft.TextAlign.CENTER, size=23, width=130),
+                                            ft.Text(noticia["title"], text_align=ft.TextAlign.LEFT, size=23, width=page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                                             ft.IconButton(
                                                 icon=ft.icons.INDETERMINATE_CHECK_BOX,
                                                 icon_color="blue400",
@@ -423,16 +552,113 @@ def main(page: ft.Page):
                     on_will_accept=drag_will_accept,
                     on_leave=drag_leave,
                 ),
-                content_feedback=ft.Text(f"Notícia {i}", text_align=ft.TextAlign.CENTER, size=23, color=ft.colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
+                content_feedback=ft.Text(noticia["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
+            )
+        
+    def getPubli(i, pub):
+        return ft.Draggable(
+                group="Publicação",
+                content=ft.DragTarget(
+                    group="Publicação",
+                    content=ft.ExpansionTile(
+                        title = ft.Row(
+                                        [
+                                            ft.Text(pub["title"], text_align=ft.TextAlign.LEFT, size=23, width=page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                            ft.IconButton(
+                                                icon=ft.icons.INDETERMINATE_CHECK_BOX,
+                                                icon_color="blue400",
+                                                icon_size=30,
+                                                tooltip="Remover publicação",
+                                                on_click=removePub,
+                                                width=100,
+                                            ),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                                    ),
+                        controls=[ft.Container(
+                            content=ft.Row(
+                                [
+                                    ft.Column(
+                                                [
+                                                    ft.TextField(pub["image"]["url"], label="Url da imagem", on_change=lambda e: changePub(e, column='image', imageCol='url'), width=600),
+                                                    ft.Image(
+                                                                src=pub["image"]["url"],
+                                                                width=500,
+                                                            ),
+                                                    ft.ElevatedButton("Escolher uma imagem...", on_click=lambda e: pickFilesPB(e)),
+                                                    ft.TextField(pub["image"]["alt"], width=600, height=100, on_change=lambda e: changePub(e, column='image', imageCol='alt'), label="Alt da imagem")
+                                                ],
+                                                alignment=ft.MainAxisAlignment.START,
+                                                horizontal_alignment = ft.CrossAxisAlignment.CENTER,
+                                            ),
+                                    ft.Column(
+                                        [
+                                            ft.ListTile(
+                                                title=ft.TextField(pub['title'], on_change=lambda e: changePub(e, column='title'), label="Título"),
+                                                width=600, 
+                                                ),
+                                            ft.ListTile(
+                                                title=ft.TextField(pub['publishDate'], on_change=lambda e: changePub(e, column='publishDate'), label="Data"), 
+                                                dense=True,
+                                                width=600, 
+                                                ),
+                                            ft.ListTile(
+                                                title=ft.TextField(pub["content"], multiline=True, on_change=lambda e: changePub(e, column='content'), label="Conteúdo"),
+                                                width=600, 
+                                            ),
+                                            ft.ListTile(
+                                                title=ft.TextField(pub["link"], on_change=lambda e: changePub(e, column='link'), label="Link da publicação"),
+                                                width=600, 
+                                            ),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.START,
+                                        horizontal_alignment = ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                ],
+                                wrap=True,
+                                alignment = ft.MainAxisAlignment.CENTER,
+                            ),
+                            padding=ft.padding.symmetric(vertical=10),
+                        )]
+                    ),
+                    on_accept=dragPB_accept,
+                    on_will_accept=drag_will_accept,
+                    on_leave=drag_leave,
+                ),
+                content_feedback=ft.Text(pub["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
             )
 
     for i in range(len(dataNews['noticias'])):
         noticia = dataNews['noticias'][i]
         lv.controls.append( getNoticia(i, noticia) )
 
-    page.add(lv, 
-             botoes
-            )
+    for i in range(len(dataNews['publicados'])):
+        publicacao = dataNews['publicados'][i]
+        pb.controls.append( getPubli(i, publicacao) )
+
+    tabs = ft.Tabs(
+        selected_index=0,
+        animation_duration=300,
+        tabs=[
+            ft.Tab(
+                text="Notícias",
+                content=ft.Column([
+                    lv,
+                    botoes
+                ])
+            ),
+            ft.Tab(
+                text="Publicações",
+                content=ft.Column([
+                    pb,
+                    botoesPB
+                ])
+            ),
+        ],
+        expand=1,
+    )
+    
+    page.add(tabs)
 
     page.update()
 
