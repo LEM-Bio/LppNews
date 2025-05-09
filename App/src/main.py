@@ -3,18 +3,19 @@ import json
 from copy import deepcopy
 from flet_toast import flet_toast
 import os
-from utils import rmtree
-import uploadImgur
+import uploadImgur as uploadImgur
 import git
 import shutil
-import config
+import config as config
 import pynpm as npm
 import paramiko
 from connection import MySFTPClient
+import noticias as nt
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
-rmtree(paginaPath)
+if os.path.isdir(paginaPath):
+    shutil.rmtree(paginaPath)
 
 git.Git(output).clone(f'https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git', "--branch=main")
 
@@ -48,16 +49,23 @@ def main(page: ft.Page):
     global dataNews
 
     #DEFINIR O QUE APARECE NA TELA
-    lv = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=False)
+    file_picker = ft.FilePicker()
+    page.overlay.append(file_picker)
+    page.update()
+
+    lv = nt.Noticia(page, dataNews, file_picker)
     pb = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=False)
     
     botoes = ft.ResponsiveRow()
     botoesPB = ft.ResponsiveRow()
     
+    #region Exit PopUp
+
     #FECHAR JSON ANTES DE FECHAR APP
     def handle_window_event(e):
-        if e.data == "close":
-            page.open(confirm_dialog)
+        if e.data == "close" and sendingContent.open == False:
+            confirm_dialog.open = True
+            page.update()
 
     page.window.prevent_close = True
     page.window.on_event = handle_window_event
@@ -84,6 +92,10 @@ def main(page: ft.Page):
         actions_alignment=ft.MainAxisAlignment.END,
     )
 
+    #endregion
+
+    #region Save PopUp
+
     def saveYes(e, closeDiag = True):
         global dataNewsOriginal
         dataNewsOriginal = {}
@@ -103,13 +115,13 @@ def main(page: ft.Page):
             flet_toast.error(
                 page=page,
                 message="Erro ao conectar no github",
-                position=flet_toast.Position.TOP_LEFT,
+                position="top_right",
                 duration=3
             )
         
         if closeDiag:
             page.close(confirmSave_dialog)
-        newsReset()
+        lv.newsReset()
 
     def saveNo(e):
         page.close(confirmSave_dialog)
@@ -126,17 +138,12 @@ def main(page: ft.Page):
     )
 
     def saveData(e):
-        page.open(confirmSave_dialog)
-
-
-    def newsReset():
-        lv.controls.clear()
-        for i in range(len(dataNews['noticias'])):
-            noticia = dataNews['noticias'][i]
-            lv.controls.append( getNoticia(i, noticia) )
-            
+        confirmSave_dialog.open = True
         page.update()
-        
+
+    #endregion
+
+    #region Reset Changes
     def pbsReset():
         pb.controls.clear()
         for i in range(len(dataNews['publicados'])):
@@ -144,13 +151,15 @@ def main(page: ft.Page):
             pb.controls.append( getPubli(i, publicacao) )
             
         page.update()
+    #endregion
 
+    #region Discard Popup
     def discardYes(e):
         global dataNews
         dataNews = {}
         dataNews = deepcopy(dataNewsOriginal)
         
-        newsReset()
+        nt.newsReset()
         pbsReset()
         
         page.close(confirmDiscard_dialog)
@@ -170,31 +179,13 @@ def main(page: ft.Page):
     )
 
     def discardData(e):
-        page.open(confirmDiscard_dialog)
+        confirmDiscard_dialog.open = True
+        page.update()
 
+    #endregion
 
-    def addNot(e):
-        novaNoticia = {
-                "title": "",
-                "content": "",
-                "image": {
-                    "url": "",
-                    "alt": ""
-                },
-                "publishDate": "",
-                "link": ""
-            }
-
-        dataNews['noticias'].insert(0, novaNoticia)
-        newsReset()
-        
-        flet_toast.sucess(
-            page=page,
-            message="Nova notícia adicionada",
-            position=flet_toast.Position.TOP_LEFT,
-            duration=3
-        )
-        
+    #region Add Content
+  
     def addPub(e):
         novaPub = {
                 "title": "",
@@ -213,27 +204,27 @@ def main(page: ft.Page):
         flet_toast.sucess(
             page=page,
             message="Nova publicação adicionada",
-            position=flet_toast.Position.TOP_LEFT,
+            position="top_right",
             duration=3
         )
     
+    #endregion
+    
+    #region Send Content
+    sendingContent = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Carregando conteúdo..."),
+        content=ft.Container(height = 50, alignment=ft.Alignment(0,0.5), content=ft.ProgressRing(width=30, height=30, stroke_width = 3))
+    )
+
     def trySend(e):
         user = e.control.parent.content.controls[0].value
         password = e.control.parent.content.controls[1].value
         saveYes(e, False)
 
-        defaultContent = insertLogin_dialog.content.controls.copy()
-        defaultActions = insertLogin_dialog.actions.copy()
-        defaultTitle = insertLogin_dialog.title
-
-        insertLogin_dialog.content.controls.clear()
-        insertLogin_dialog.actions.clear()
-        insertLogin_dialog.title = ft.Text("Carregando arquivos...")
-        insertLogin_dialog.update()
-        insertLogin_dialog.content = ft.Container(height = 50, alignment=ft.alignment.center)
-        insertLogin_dialog.content.content = (ft.ProgressRing(width=30, height=30, stroke_width = 3))
-
-        insertLogin_dialog.update()
+        insertLogin_dialog.open = False
+        sendingContent.open = True
+        page.update()
 
         print(f'{paginaPath}{os.sep}package.json')
         pkg = npm.NPMPackage(f'{paginaPath}{os.sep}package.json')
@@ -247,13 +238,9 @@ def main(page: ft.Page):
         sftp = MySFTPClient.from_transport(transport)
         sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
         sftp.close()
-        
-        insertLogin_dialog.content = ft.Column(defaultContent.copy(), height=100)
-        insertLogin_dialog.actions = defaultActions.copy()
-        insertLogin_dialog.title = defaultTitle
 
-        page.close(insertLogin_dialog)
-        insertLogin_dialog.update()
+        sendingContent.open = False
+        page.update()
         
 
     def closeLogin(e):
@@ -263,7 +250,7 @@ def main(page: ft.Page):
         modal=True,
         title=ft.Row([
             ft.Text("Insira seus dados do servidor"),
-            ft.IconButton(icon=ft.icons.CLOSE, on_click=closeLogin)
+            ft.IconButton(icon=ft.Icons.CLOSE, on_click=closeLogin)
             ]),
         content=ft.Column([
             ft.TextField(label="Usuario"),
@@ -276,23 +263,26 @@ def main(page: ft.Page):
     )
 
     def sendData(e):
-        page.open(insertLogin_dialog)
+        insertLogin_dialog.open = True
+        page.update()
+    
+    #endregion
 
-    #Definindo os botoes de salvamento, descarte, adiçao de noticias e envio ao servidor
+    #region Definindo os botoes de salvamento, descarte, adiçao de noticias e envio ao servidor
     botoes.controls.append(
         ft.Row(
                 [
                     ft.IconButton(
-                        icon=ft.icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar noticia",
-                        on_click=addNot
+                        on_click=lv.addNot
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
                     ft.IconButton(
-                        icon=ft.icons.SEND,
+                        icon=ft.Icons.SEND,
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Enviar dados salvos ao servidor",
@@ -307,7 +297,7 @@ def main(page: ft.Page):
         ft.Row(
                 [
                     ft.IconButton(
-                        icon=ft.icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar publicação",
@@ -316,7 +306,7 @@ def main(page: ft.Page):
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
                     ft.IconButton(
-                        icon=ft.icons.SEND,
+                        icon=ft.Icons.SEND,
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Enviar dados salvos ao servidor",
@@ -327,20 +317,9 @@ def main(page: ft.Page):
             )
     )
 
-    def changeData(e, column, imageCol=''):
-        if imageCol == '':
-            index = lv.controls.index(e.control.parent.parent.parent.parent.parent.parent.parent)
-        else:
-            index = lv.controls.index(e.control.parent.parent.parent.parent.parent.parent)
+    #endregion
 
-        if len(lv.controls) > index:
-            dataToChange = str(e).split("data='")[1][0:-2]
-            if imageCol == '':
-                dataNews['noticias'][index][column] = dataToChange
-                return
-                
-            dataNews['noticias'][index][column][imageCol] = dataToChange
-    
+    #region Change Content
     def changePub(e, column, imageCol=''):
         if imageCol == '':
             index = pb.controls.index(e.control.parent.parent.parent.parent.parent.parent.parent)
@@ -355,20 +334,9 @@ def main(page: ft.Page):
                 
             dataNews['publicados'][index][column][imageCol] = dataToChange
 
-    def removeNot(e):
-        noticia = e.control.parent.parent.parent.parent
-        index = lv.controls.index(noticia)
-        lv.controls.remove(noticia)
-        dataNews['noticias'].pop(index)
+    #endregion
 
-        newsReset()
-        flet_toast.sucess(
-            page=page,
-            message="Notícia removida",
-            position=flet_toast.Position.TOP_LEFT,
-            duration=3
-        )
-        
+    #region Remove Content      
     def removePub(e):
         publicacao = e.control.parent.parent.parent.parent
         index = pb.controls.index(publicacao)
@@ -379,33 +347,13 @@ def main(page: ft.Page):
         flet_toast.sucess(
             page=page,
             message="Publicação removida",
-            position=flet_toast.Position.TOP_LEFT,
+            position="top_right",
             duration=3
         )
+    
+    #endregion
 
-    def drag_accept(e):
-        # get draggable (source) control by its ID
-        src = page.get_control(e.src_id)
-        
-        src.content.content, e.control.content = e.control.content, src.content.content
-
-        indexSent = lv.controls.index(src)
-        indexGot = lv.controls.index(e.control.parent)
-        dataNews['noticias'][indexSent], dataNews['noticias'][indexGot] = dataNews['noticias'][indexGot], dataNews['noticias'][indexSent]
-
-        # reset border
-        e.control.content.color = None
-        newsReset()
-
-        flet_toast.sucess(
-            page=page,
-            message="Ordem atualizada",
-            position=flet_toast.Position.TOP_LEFT,
-            duration=3
-        )
-
-        page.update()
-        
+    #region Drag Content
     def dragPB_accept(e):
         # get draggable (source) control by its ID
         src = page.get_control(e.src_id)
@@ -423,34 +371,25 @@ def main(page: ft.Page):
         flet_toast.sucess(
             page=page,
             message="Ordem atualizada",
-            position=flet_toast.Position.TOP_LEFT,
+            position="top_right",
             duration=3
         )
 
         page.update()
 
     def drag_will_accept(e):
-        e.control.content.color = ft.colors.BLUE_600
+        e.control.content.color = ft.Colors.BLUE_600
         e.control.update()
 
     def drag_leave(e):
         e.control.content.color = None
         e.control.update()
 
+    #endregion
+
+    #region Select Image
     global imageTextField
     imageTextField = ft.TextField()
-
-    def on_dialog_result(e: ft.FilePickerResultEvent):
-        path = e.files[0].path
-        imgurUrl = uploadImgur.uploadImage(path)
-        e.control.parent.parent.controls[0].value = imgurUrl
-        
-        imageTextField.value = imgurUrl
-        index = lv.controls.index(imageTextField.parent.parent.parent.parent.parent.parent)
-
-        if len(lv.controls) > index:
-            dataNews['noticias'][index]['image']['url'] = imgurUrl
-        newsReset()
         
     def on_dialog_resultPB(e: ft.FilePickerResultEvent):
         path = e.files[0].path
@@ -463,13 +402,6 @@ def main(page: ft.Page):
         if len(pb.controls) > index:
             dataNews['publicados'][index]['image']['url'] = imgurUrl
         pbsReset()
-
-    def pickFiles(e):
-        global imageTextField
-        imageTextField = e.control.parent.controls[0]
-        
-        file_picker.on_result = on_dialog_result
-        file_picker.pick_files(allow_multiple=False)
         
     def pickFilesPB(e):
         global imageTextField
@@ -478,84 +410,10 @@ def main(page: ft.Page):
         file_picker.on_result = on_dialog_resultPB
         file_picker.pick_files(allow_multiple=False)
 
-    file_picker = ft.FilePicker()
-    page.overlay.append(file_picker)
-    page.update()
+    #endregion
 
-    def getNoticia(i, noticia):
-        return ft.Draggable(
-                group="Noticia",
-                content=ft.DragTarget(
-                    group="Noticia",
-                    content=ft.ExpansionTile(
-                        title = ft.Row(
-                                        [
-                                            ft.Text(noticia["title"], text_align=ft.TextAlign.LEFT, size=23, width=page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                                            ft.IconButton(
-                                                icon=ft.icons.INDETERMINATE_CHECK_BOX,
-                                                icon_color="blue400",
-                                                icon_size=30,
-                                                tooltip="Remover noticia",
-                                                on_click=removeNot,
-                                                width=100,
-                                            ),
-                                        ],
-                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                    ),
-                        controls=[ft.Container(
-                            content=ft.Row(
-                                [
-                                    ft.Column(
-                                                [
-                                                    ft.TextField(noticia["image"]["url"], label="Url da imagem", on_change=lambda e: changeData(e, column='image', imageCol='url'), width=600),
-                                                    ft.Image(
-                                                                src=noticia["image"]["url"],
-                                                                width=500,
-                                                            ),
-                                                    ft.ElevatedButton("Escolher uma imagem...", on_click=lambda e: pickFiles(e)),
-                                                    ft.TextField(noticia["image"]["alt"], width=600, height=100, on_change=lambda e: changeData(e, column='image', imageCol='alt'), label="Alt da imagem")
-                                                ],
-                                                alignment=ft.MainAxisAlignment.START,
-                                                horizontal_alignment = ft.CrossAxisAlignment.CENTER,
-                                            ),
-                                    ft.Column(
-                                        [
-                                            ft.ListTile(
-                                                title=ft.TextField(noticia['title'], on_change=lambda e: changeData(e, column='title'), label="Título"),
-                                                width=600, 
-                                                ),
-                                            ft.ListTile(
-                                                title=ft.TextField(noticia['publishDate'], on_change=lambda e: changeData(e, column='publishDate'), label="Data"), 
-                                                dense=True,
-                                                width=600, 
-                                                ),
-                                            ft.ListTile(
-                                                title=ft.TextField(noticia["content"], multiline=True, on_change=lambda e: changeData(e, column='content'), label="Conteúdo"),
-                                                width=600, 
-                                            ),
-                                            ft.ListTile(
-                                                title=ft.TextField(noticia["link"], on_change=lambda e: changeData(e, column='link'), label="Link da notícia"),
-                                                width=600, 
-                                            ),
-                                        ],
-                                        alignment=ft.MainAxisAlignment.START,
-                                        horizontal_alignment = ft.CrossAxisAlignment.CENTER,
-                                    ),
-                                ],
-                                wrap=True,
-                                alignment = ft.MainAxisAlignment.CENTER,
-                            ),
-                            padding=ft.padding.symmetric(vertical=10),
-                        )]
-                    ),
-                    on_accept=drag_accept,
-                    on_will_accept=drag_will_accept,
-                    on_leave=drag_leave,
-                ),
-                content_feedback=ft.Text(noticia["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
-            )
-        
-    def getPubli(i, pub):
+    #region Get Content for Flet
+    def getPubli(pub):
         return ft.Draggable(
                 group="Publicação",
                 content=ft.DragTarget(
@@ -565,7 +423,7 @@ def main(page: ft.Page):
                                         [
                                             ft.Text(pub["title"], text_align=ft.TextAlign.LEFT, size=23, width=page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                                             ft.IconButton(
-                                                icon=ft.icons.INDETERMINATE_CHECK_BOX,
+                                                icon=ft.Icons.INDETERMINATE_CHECK_BOX,
                                                 icon_color="blue400",
                                                 icon_size=30,
                                                 tooltip="Remover publicação",
@@ -617,24 +475,25 @@ def main(page: ft.Page):
                                 ],
                                 wrap=True,
                                 alignment = ft.MainAxisAlignment.CENTER,
-                            ),
-                            padding=ft.padding.symmetric(vertical=10),
+                            )
                         )]
                     ),
                     on_accept=dragPB_accept,
                     on_will_accept=drag_will_accept,
                     on_leave=drag_leave,
                 ),
-                content_feedback=ft.Text(pub["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
+                content_feedback=ft.Text(pub["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.Colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
             )
 
     for i in range(len(dataNews['noticias'])):
         noticia = dataNews['noticias'][i]
-        lv.controls.append( getNoticia(i, noticia) )
+        lv.controls.append( lv.getNoticia(noticia) )
 
     for i in range(len(dataNews['publicados'])):
         publicacao = dataNews['publicados'][i]
-        pb.controls.append( getPubli(i, publicacao) )
+        pb.controls.append( getPubli(publicacao) )
+    
+    #endregion
 
     tabs = ft.Tabs(
         selected_index=0,
@@ -658,7 +517,7 @@ def main(page: ft.Page):
         expand=1,
     )
     
-    page.add(tabs)
+    page.add(tabs, confirm_dialog, confirmSave_dialog, insertLogin_dialog, confirmDiscard_dialog, sendingContent)
 
     page.update()
 
