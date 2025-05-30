@@ -194,5 +194,5 @@ class Noticia(ft.ListView):
         global imageTextField
         imageTextField = e.control.parent.controls[0]
         
-        self.file_picker.on_result = self.on_dialog_result
-        self.file_picker.pick_files(allow_multiple=False)
+        self.filepicker.on_result = self.on_dialog_result
+        self.filepicker.pick_files(allow_multiple=False)

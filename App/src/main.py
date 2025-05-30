@@ -11,6 +11,11 @@ import pynpm as npm
 import paramiko
 from connection import MySFTPClient
 import noticias as nt
+import publicacoes as publi
+import equipamentos as eqp
+import coordenadores as coord
+import docentes as doc
+import equipe as tec
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -54,10 +59,16 @@ def main(page: ft.Page):
     page.update()
 
     lv = nt.Noticia(page, dataNews, file_picker)
-    pb = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=False)
+    pb = publi.Publicacao(page, dataNews, file_picker)
+    equip = eqp.Equipamento(page, dataNews, file_picker)
+    crdn = coord.Coordenador(page, dataNews, file_picker)
+    docnt = doc.Docente(page, dataNews, file_picker)
+    eqpTec = tec.Equipe(page, dataNews, file_picker)
     
     botoes = ft.ResponsiveRow()
     botoesPB = ft.ResponsiveRow()
+    botoesEqp = ft.ResponsiveRow()
+    botoesEquipe = ft.ResponsiveRow()
     
     #region Exit PopUp
 
@@ -122,6 +133,7 @@ def main(page: ft.Page):
         if closeDiag:
             page.close(confirmSave_dialog)
         lv.newsReset()
+        pb.pbsReset()
 
     def saveNo(e):
         page.close(confirmSave_dialog)
@@ -143,24 +155,17 @@ def main(page: ft.Page):
 
     #endregion
 
-    #region Reset Changes
-    def pbsReset():
-        pb.controls.clear()
-        for i in range(len(dataNews['publicados'])):
-            publicacao = dataNews['publicados'][i]
-            pb.controls.append( getPubli(i, publicacao) )
-            
-        page.update()
-    #endregion
-
     #region Discard Popup
     def discardYes(e):
         global dataNews
         dataNews = {}
         dataNews = deepcopy(dataNewsOriginal)
         
-        nt.newsReset()
-        pbsReset()
+        lv.dataNews = dataNews
+        pb.dataNews = dataNews
+        
+        lv.newsReset()
+        pb.pbsReset()
         
         page.close(confirmDiscard_dialog)
 
@@ -182,32 +187,6 @@ def main(page: ft.Page):
         confirmDiscard_dialog.open = True
         page.update()
 
-    #endregion
-
-    #region Add Content
-  
-    def addPub(e):
-        novaPub = {
-                "title": "",
-                "content": "",
-                "image": {
-                    "url": "",
-                    "alt": ""
-                },
-                "publishDate": "",
-                "link": ""
-            }
-
-        dataNews['publicados'].insert(0, novaPub)
-        pbsReset()
-        
-        flet_toast.sucess(
-            page=page,
-            message="Nova publicação adicionada",
-            position="top_right",
-            duration=3
-        )
-    
     #endregion
     
     #region Send Content
@@ -301,7 +280,73 @@ def main(page: ft.Page):
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar publicação",
-                        on_click=addPub
+                        on_click=pb.addPub
+                    ),
+                    ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
+                    ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
+                    ft.IconButton(
+                        icon=ft.Icons.SEND,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Enviar dados salvos ao servidor",
+                        on_click=sendData,
+                    )
+                ],
+                alignment="CENTER",
+            )
+    )
+
+    botoesEqp.controls.append(
+        ft.Row(
+                [
+                    ft.IconButton(
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Adicionar equipamento",
+                        on_click=equip.addEquip
+                    ),
+                    ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
+                    ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
+                    ft.IconButton(
+                        icon=ft.Icons.SEND,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Enviar dados salvos ao servidor",
+                        on_click=sendData,
+                    )
+                ],
+                alignment="CENTER",
+            )
+    )
+
+    equipDrop = ft.Dropdown(
+                        leading_icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        label="Adicionar",
+                        tooltip="Adicionar na equipe",
+                        value="Coordenador",
+                        options=[
+                            ft.DropdownOption("Coordenador", on_click=crdn.addCoord),
+                            ft.DropdownOption("Docente", on_click=docnt.addCoord),
+                            ft.DropdownOption("Tecnico", on_click=eqpTec.addCoord),
+                        ]
+                    )
+    
+    def addEquipe(e):
+        if equipDrop.value == "Coordenador": crdn.addCoord(e)
+        elif equipDrop.value == "Docente": docnt.addCoord(e)
+        elif equipDrop.value == "Tecnico": eqpTec.addCoord(e)
+
+    botoesEquipe.controls.append(
+        ft.Row(
+                [
+                    equipDrop,
+                    ft.IconButton(
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Adicionar a equipe",
+                        on_click=addEquipe
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
@@ -319,181 +364,29 @@ def main(page: ft.Page):
 
     #endregion
 
-    #region Change Content
-    def changePub(e, column, imageCol=''):
-        if imageCol == '':
-            index = pb.controls.index(e.control.parent.parent.parent.parent.parent.parent.parent)
-        else:
-            index = pb.controls.index(e.control.parent.parent.parent.parent.parent.parent)
-
-        if len(pb.controls) > index:
-            dataToChange = str(e).split("data='")[1][0:-2]
-            if imageCol == '':
-                dataNews['publicados'][index][column] = dataToChange
-                return
-                
-            dataNews['publicados'][index][column][imageCol] = dataToChange
-
-    #endregion
-
-    #region Remove Content      
-    def removePub(e):
-        publicacao = e.control.parent.parent.parent.parent
-        index = pb.controls.index(publicacao)
-        pb.controls.remove(publicacao)
-        dataNews['publicados'].pop(index)
-
-        pbsReset()
-        flet_toast.sucess(
-            page=page,
-            message="Publicação removida",
-            position="top_right",
-            duration=3
-        )
-    
-    #endregion
-
-    #region Drag Content
-    def dragPB_accept(e):
-        # get draggable (source) control by its ID
-        src = page.get_control(e.src_id)
-        
-        src.content.content, e.control.content = e.control.content, src.content.content
-
-        indexSent = pb.controls.index(src)
-        indexGot = pb.controls.index(e.control.parent)
-        dataNews['publicados'][indexSent], dataNews['publicados'][indexGot] = dataNews['publicados'][indexGot], dataNews['publicados'][indexSent]
-
-        # reset border
-        e.control.content.color = None
-        pbsReset()
-
-        flet_toast.sucess(
-            page=page,
-            message="Ordem atualizada",
-            position="top_right",
-            duration=3
-        )
-
-        page.update()
-
-    def drag_will_accept(e):
-        e.control.content.color = ft.Colors.BLUE_600
-        e.control.update()
-
-    def drag_leave(e):
-        e.control.content.color = None
-        e.control.update()
-
-    #endregion
-
-    #region Select Image
-    global imageTextField
-    imageTextField = ft.TextField()
-        
-    def on_dialog_resultPB(e: ft.FilePickerResultEvent):
-        path = e.files[0].path
-        imgurUrl = uploadImgur.uploadImage(path)
-        e.control.parent.parent.controls[0].value = imgurUrl
-        
-        imageTextField.value = imgurUrl
-        index = pb.controls.index(imageTextField.parent.parent.parent.parent.parent.parent)
-
-        if len(pb.controls) > index:
-            dataNews['publicados'][index]['image']['url'] = imgurUrl
-        pbsReset()
-        
-    def pickFilesPB(e):
-        global imageTextField
-        imageTextField = e.control.parent.controls[0]
-        
-        file_picker.on_result = on_dialog_resultPB
-        file_picker.pick_files(allow_multiple=False)
-
-    #endregion
-
-    #region Get Content for Flet
-    def getPubli(pub):
-        return ft.Draggable(
-                group="Publicação",
-                content=ft.DragTarget(
-                    group="Publicação",
-                    content=ft.ExpansionTile(
-                        title = ft.Row(
-                                        [
-                                            ft.Text(pub["title"], text_align=ft.TextAlign.LEFT, size=23, width=page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                                            ft.IconButton(
-                                                icon=ft.Icons.INDETERMINATE_CHECK_BOX,
-                                                icon_color="blue400",
-                                                icon_size=30,
-                                                tooltip="Remover publicação",
-                                                on_click=removePub,
-                                                width=100,
-                                            ),
-                                        ],
-                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                    ),
-                        controls=[ft.Container(
-                            content=ft.Row(
-                                [
-                                    ft.Column(
-                                                [
-                                                    ft.TextField(pub["image"]["url"], label="Url da imagem", on_change=lambda e: changePub(e, column='image', imageCol='url'), width=600),
-                                                    ft.Image(
-                                                                src=pub["image"]["url"],
-                                                                width=500,
-                                                            ),
-                                                    ft.ElevatedButton("Escolher uma imagem...", on_click=lambda e: pickFilesPB(e)),
-                                                    ft.TextField(pub["image"]["alt"], width=600, height=100, on_change=lambda e: changePub(e, column='image', imageCol='alt'), label="Alt da imagem")
-                                                ],
-                                                alignment=ft.MainAxisAlignment.START,
-                                                horizontal_alignment = ft.CrossAxisAlignment.CENTER,
-                                            ),
-                                    ft.Column(
-                                        [
-                                            ft.ListTile(
-                                                title=ft.TextField(pub['title'], on_change=lambda e: changePub(e, column='title'), label="Título"),
-                                                width=600, 
-                                                ),
-                                            ft.ListTile(
-                                                title=ft.TextField(pub['publishDate'], on_change=lambda e: changePub(e, column='publishDate'), label="Data"), 
-                                                dense=True,
-                                                width=600, 
-                                                ),
-                                            ft.ListTile(
-                                                title=ft.TextField(pub["content"], multiline=True, on_change=lambda e: changePub(e, column='content'), label="Conteúdo"),
-                                                width=600, 
-                                            ),
-                                            ft.ListTile(
-                                                title=ft.TextField(pub["link"], on_change=lambda e: changePub(e, column='link'), label="Link da publicação"),
-                                                width=600, 
-                                            ),
-                                        ],
-                                        alignment=ft.MainAxisAlignment.START,
-                                        horizontal_alignment = ft.CrossAxisAlignment.CENTER,
-                                    ),
-                                ],
-                                wrap=True,
-                                alignment = ft.MainAxisAlignment.CENTER,
-                            )
-                        )]
-                    ),
-                    on_accept=dragPB_accept,
-                    on_will_accept=drag_will_accept,
-                    on_leave=drag_leave,
-                ),
-                content_feedback=ft.Text(pub["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.Colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
-            )
-
     for i in range(len(dataNews['noticias'])):
         noticia = dataNews['noticias'][i]
         lv.controls.append( lv.getNoticia(noticia) )
 
     for i in range(len(dataNews['publicados'])):
         publicacao = dataNews['publicados'][i]
-        pb.controls.append( getPubli(publicacao) )
-    
-    #endregion
+        pb.controls.append( pb.getPubli(publicacao) )
+
+    for i in range(len(dataNews['equipamentos'])):
+        equipamento = dataNews['equipamentos'][i]
+        equip.controls.append( equip.getEquip(equipamento) )
+
+    for i in range(len(dataNews['coordenadores'])):
+        coordenador = dataNews['coordenadores'][i]
+        crdn.controls.append( crdn.getCoord(coordenador) )
+
+    for i in range(len(dataNews['docentes'])):
+        docente = dataNews['docentes'][i]
+        docnt.controls.append( docnt.getCoord(docente) )
+
+    for i in range(len(dataNews['eqTecnica'])):
+        tecnico = dataNews['eqTecnica'][i]
+        eqpTec.controls.append( eqpTec.getCoord(tecnico) )
 
     tabs = ft.Tabs(
         selected_index=0,
@@ -512,6 +405,41 @@ def main(page: ft.Page):
                     pb,
                     botoesPB
                 ])
+            ),
+            ft.Tab(
+                text="Equipamentos",
+                content=ft.Column([
+                    equip,
+                    botoesEqp
+                ])
+            ),
+            ft.Tab(
+                text="Equipe",
+                content=ft.Column([
+                    ft.Container(height=10),
+                    ft.Text(
+                        "Coordenadores",
+                        size=24,
+                        font_family="Consolas",
+                    ),
+                    ft.Divider(),
+                    crdn,
+                    ft.Text(
+                        "Docentes",
+                        size=24,
+                        font_family="Consolas"
+                    ),
+                    ft.Divider(),
+                    docnt,
+                    ft.Text(
+                        "Equipe Tecnica",
+                        size=24,
+                        font_family="Consolas"
+                    ),
+                    ft.Divider(),
+                    eqpTec,
+                    botoesEquipe
+                ], scroll=ft.ScrollMode.AUTO)
             ),
         ],
         expand=1,
