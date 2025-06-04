@@ -16,6 +16,8 @@ import equipamentos as eqp
 import coordenadores as coord
 import docentes as doc
 import equipe as tec
+import estudantes as est
+import comite as com
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -64,6 +66,8 @@ def main(page: ft.Page):
     crdn = coord.Coordenador(page, dataNews, file_picker)
     docnt = doc.Docente(page, dataNews, file_picker)
     eqpTec = tec.Equipe(page, dataNews, file_picker)
+    estud = est.Estudante(page, dataNews, file_picker)
+    cmt = com.Comite(page, dataNews, file_picker)
     
     botoes = ft.ResponsiveRow()
     botoesPB = ft.ResponsiveRow()
@@ -326,9 +330,11 @@ def main(page: ft.Page):
                         tooltip="Adicionar na equipe",
                         value="Coordenador",
                         options=[
-                            ft.DropdownOption("Coordenador", on_click=crdn.addCoord),
-                            ft.DropdownOption("Docente", on_click=docnt.addCoord),
-                            ft.DropdownOption("Tecnico", on_click=eqpTec.addCoord),
+                            ft.DropdownOption("Coordenador"),
+                            ft.DropdownOption("Docente"),
+                            ft.DropdownOption("Tecnico"),
+                            ft.DropdownOption("Estudante"),
+                            ft.DropdownOption("Usuario")
                         ]
                     )
     
@@ -336,6 +342,8 @@ def main(page: ft.Page):
         if equipDrop.value == "Coordenador": crdn.addCoord(e)
         elif equipDrop.value == "Docente": docnt.addCoord(e)
         elif equipDrop.value == "Tecnico": eqpTec.addCoord(e)
+        elif equipDrop.value == "Estudante": estud.addCoord(e)
+        elif equipDrop.value == "Usuario": cmt.addCoord(e)
 
     botoesEquipe.controls.append(
         ft.Row(
@@ -388,6 +396,14 @@ def main(page: ft.Page):
         tecnico = dataNews['eqTecnica'][i]
         eqpTec.controls.append( eqpTec.getCoord(tecnico) )
 
+    for i in range(len(dataNews['estudantes'])):
+        estudante = dataNews['estudantes'][i]
+        estud.controls.append( estud.getCoord(estudante) )
+
+    for i in range(len(dataNews['comite'])):
+        usuario = dataNews['comite'][i]
+        cmt.controls.append( cmt.getCoord(usuario) )
+
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
@@ -438,6 +454,20 @@ def main(page: ft.Page):
                     ),
                     ft.Divider(),
                     eqpTec,
+                    ft.Text(
+                        "Estudantes",
+                        size=24,
+                        font_family="Consolas"
+                    ),
+                    ft.Divider(),
+                    estud,
+                    ft.Text(
+                        "Comite de Usuarios",
+                        size=24,
+                        font_family="Consolas"
+                    ),
+                    ft.Divider(),
+                    cmt,
                     botoesEquipe
                 ], scroll=ft.ScrollMode.AUTO)
             ),
