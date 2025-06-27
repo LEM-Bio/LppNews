@@ -4,3 +4,6 @@ requests==2.32.3
 gitpython==3.1.*
 pynpm==0.2.* 
 scp==0.15.*
+pandas
+sshtunnel
+mariadb
