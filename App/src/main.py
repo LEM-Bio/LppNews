@@ -18,6 +18,9 @@ import docentes as doc
 import equipe as tec
 import estudantes as est
 import comite as com
+import artigos
+import databaseConn as db
+import pandas as pd
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -31,6 +34,11 @@ repo.git.init()
 repo.config_writer().set_value("user", "name", "mousedesvio").release()
 repo.config_writer().set_value("user", "email", "redbrickcar2@gmail.com").release()
 repo.git.remote("set-url", "origin", f"https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git")
+
+#Connect to Database
+conn = db.ConnectDB(user="pedroand", password="password")
+global database
+database = conn.GetAllData()
 
 #Noticias
 jsonPath = os.path.join(f'{output}', 'LembioWebsite', 'src', 'data', 'components-mock.json')
@@ -68,11 +76,13 @@ def main(page: ft.Page):
     eqpTec = tec.Equipe(page, dataNews, file_picker)
     estud = est.Estudante(page, dataNews, file_picker)
     cmt = com.Comite(page, dataNews, file_picker)
+    art = artigos.Artigo(page, database)
     
     botoes = ft.ResponsiveRow()
     botoesPB = ft.ResponsiveRow()
     botoesEqp = ft.ResponsiveRow()
     botoesEquipe = ft.ResponsiveRow()
+    botoesArt = ft.ResponsiveRow()
     
     #region Exit PopUp
 
@@ -90,6 +100,7 @@ def main(page: ft.Page):
 
         json.dump(dataNewsOriginal, wNews, indent=2)
         wNews.close()
+        conn.CloseConnection()
         shutil.rmtree(os.path.join(f'{output[:-1]}', 'LembioWebsite'), ignore_errors=True)
         page.window.destroy()
 
@@ -324,6 +335,30 @@ def main(page: ft.Page):
             )
     )
 
+    botoesArt.controls.append(
+        ft.Row(
+                [
+                    ft.IconButton(
+                        icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Adicionar artigo",
+                        on_click=art.addArtigo
+                    ),
+                    ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
+                    ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
+                    ft.IconButton(
+                        icon=ft.Icons.SEND,
+                        icon_color="blue400",
+                        icon_size=40,
+                        tooltip="Enviar dados salvos ao servidor",
+                        on_click=sendData,
+                    )
+                ],
+                alignment="CENTER",
+            )
+    )
+
     equipDrop = ft.Dropdown(
                         leading_icon=ft.Icons.ADD_CIRCLE_OUTLINE_ROUNDED,
                         label="Adicionar",
@@ -404,6 +439,10 @@ def main(page: ft.Page):
         usuario = dataNews['comite'][i]
         cmt.controls.append( cmt.getCoord(usuario) )
 
+    for i in range(len(database)):
+        artigo = database.iloc[i].to_dict()
+        art.controls.append( art.getArtigo(artigo) )
+
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
@@ -470,6 +509,13 @@ def main(page: ft.Page):
                     cmt,
                     botoesEquipe
                 ], scroll=ft.ScrollMode.AUTO)
+            ),
+            ft.Tab(
+                text="Artigos",
+                content=ft.Column([
+                    art,
+                    botoesArt
+                ])
             ),
         ],
         expand=1,
