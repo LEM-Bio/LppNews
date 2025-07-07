@@ -1,81 +1,39 @@
-# App app
 
-## Run the app
+# LppNews - Manutenção do site do LEMBio
 
-### uv
+Este software foi criado com o intuito de facilitar a manutenção do site do LEMBio por seus membros, sem que seja necessário qualquer conhecimento de desenvolvimento web para tal.
 
-Run as a desktop app:
 
-```
-uv run flet run
-```
 
-Run as a web app:
 
-```
-uv run flet run --web
+## Rode Localmente
+
+Clone the project
+
+```bash
+  git clone https://github.com/LEM-Bio/LppNews.git
 ```
 
-### Poetry
+Go to the project directory
 
-Install dependencies from `pyproject.toml`:
-
-```
-poetry install
+```bash
+  cd LppNews
 ```
 
-Run as a desktop app:
+Install dependencies
 
-```
-poetry run flet run
-```
-
-Run as a web app:
-
-```
-poetry run flet run --web
+```bash
+  pip install -r requirements.txt
 ```
 
-For more details on running the app, refer to the [Getting Started Guide](https://flet.dev/docs/getting-started/).
+Configure Git
 
-## Build the app
+- Create config.py
+- Set variable 'secret_token' as the git token
 
-### Android
+Start the app
 
-```
-flet build apk -v
-```
-
-For more details on building and signing `.apk` or `.aab`, refer to the [Android Packaging Guide](https://flet.dev/docs/publish/android/).
-
-### iOS
-
-```
-flet build ipa -v
+```bash
+  flet run App
 ```
 
-For more details on building and signing `.ipa`, refer to the [iOS Packaging Guide](https://flet.dev/docs/publish/ios/).
-
-### macOS
-
-```
-flet build macos -v
-```
-
-For more details on building macOS package, refer to the [macOS Packaging Guide](https://flet.dev/docs/publish/macos/).
-
-### Linux
-
-```
-flet build linux -v
-```
-
-For more details on building Linux package, refer to the [Linux Packaging Guide](https://flet.dev/docs/publish/linux/).
-
-### Windows
-
-```
-flet build windows -v
-```
-
-For more details on building Windows package, refer to the [Windows Packaging Guide](https://flet.dev/docs/publish/windows/).
