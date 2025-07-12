@@ -24,7 +24,6 @@ class ConnectDB():
                 host="127.0.0.1",
                 port=3307,
                 database="sitesLab",
-                connect_timeout=60
             )
             self.conn = conn
             print("Connected successfully.")
@@ -35,10 +34,16 @@ class ConnectDB():
             sys.exit(1)
 
     def GetAllData(self):
-        self.cur.execute("SELECT * FROM pubsLEMBio")
+        self.cur.execute("SELECT count(*) FROM pubsLEMBio")
+        count = self.cur.fetchone()[0]
+        batch_size = 1 # whatever
         rows = []
-        for row in self.cur:
-            print(row)
+
+        for offset in range(0, count, batch_size):
+            self.cur.execute(
+                "SELECT * FROM pubsLEMBio LIMIT %s OFFSET %s", 
+                (batch_size, offset))
+            row = self.cur.fetchone()
             rows.append(row)
 
         # Captura os nomes das colunas

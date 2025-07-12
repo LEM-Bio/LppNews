@@ -218,6 +218,7 @@ def main(page: ft.Page):
 
         insertLogin_dialog.open = False
         sendingContent.open = True
+        sendingContent.modal = True
         page.update()
 
         print(f'{paginaPath}{os.sep}package.json')
@@ -232,6 +233,15 @@ def main(page: ft.Page):
         sftp = MySFTPClient.from_transport(transport)
         sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
         sftp.close()
+
+        try:
+            for index, row in database.iterrows():
+                print(row)
+                sql = f'UPDATE pubsLEMBio SET id = {row["id"]}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}" where id = {index+1}'
+                print(sql)
+                conn.ExcuteQuery(sql)
+        except:
+            pass
 
         sendingContent.open = False
         page.update()
