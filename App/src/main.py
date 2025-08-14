@@ -21,6 +21,7 @@ import comite as com
 import artigos
 import databaseConn as db
 import pandas as pd
+from login import LogInfo as login
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -31,16 +32,13 @@ git.Git(output).clone(f'https://{config.secret_token}@github.com/LEM-Bio/LembioW
 
 repo = git.Repo(paginaPath)
 repo.git.init()
-repo.config_writer().set_value("user", "name", "mousedesvio").release()
+repo.config_writer().set_value("user", "name", "pedroand6").release()
 repo.config_writer().set_value("user", "email", "redbrickcar2@gmail.com").release()
 repo.git.remote("set-url", "origin", f"https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git")
 
-#Connect to Database
-conn = db.ConnectDB(user="pedroand", password="password")
-global database
-database = conn.GetAllData()
+currentAuth = login("", "")
 
-#Noticias
+#Carrega os dados
 jsonPath = os.path.join(f'{output}', 'LembioWebsite', 'src', 'data', 'components-mock.json')
 
 fNews = open(jsonPath, "r")
@@ -54,11 +52,59 @@ fNews.close()
 dataNews = json.load(fNews2)
 fNews2.close()
 
+global database
+global conn
+conn = db.ConnectDB("", "")
+database = pd.DataFrame([]) #Mock database
+
 def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     page.title = "Aplicativo para atualização do Website LEMbio"
     page.window.min_height = 300
     page.window.min_width = 450
+
+    def LogIn(e):
+        currentAuth.user = e.control.parent.content.controls[0].value
+        currentAuth.password = e.control.parent.content.controls[1].value
+        if currentAuth.checkValidation(): 
+            #Connect to Database
+            global conn
+            conn = db.ConnectDB(user=currentAuth.user, password=currentAuth.password)
+            global database
+            database = conn.GetAllData()
+            global art
+            art = artigos.Artigo(page, database)
+
+            for i in range(len(database)):
+                artigo = database.iloc[i].to_dict()
+                art.controls.append( art.getArtigo(artigo) )
+
+            page.update()
+            page.close(insertLogin_dialog)
+        else:
+            flet_toast.error(
+                page=page,
+                message="Usuario ou senha incorretos",
+                position="top_right",
+                duration=3
+            )
+
+    insertLogin_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Row([
+            ft.Text("Insira seus dados do servidor"),
+            ]),
+        content=ft.Column([
+            ft.TextField(label="Usuario"),
+            ft.TextField(label="Senha", password=True)
+        ], height=100),
+        actions=[
+            ft.ElevatedButton("Enviar", on_click=LogIn),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    insertLogin_dialog.open = True #Ask login when start
 
     global dataNewsOriginal
     global dataNews
@@ -76,6 +122,8 @@ def main(page: ft.Page):
     eqpTec = tec.Equipe(page, dataNews, file_picker)
     estud = est.Estudante(page, dataNews, file_picker)
     cmt = com.Comite(page, dataNews, file_picker)
+
+    global art
     art = artigos.Artigo(page, database)
     
     botoes = ft.ResponsiveRow()
@@ -88,9 +136,11 @@ def main(page: ft.Page):
 
     #FECHAR JSON ANTES DE FECHAR APP
     def handle_window_event(e):
-        if e.data == "close" and sendingContent.open == False:
+        if e.data == "close" and sendingContent.open == False and insertLogin_dialog.open == False:
             confirm_dialog.open = True
             page.update()
+        elif e.data == "close" and insertLogin_dialog.open == True:
+            handle_yes(e)
 
     page.window.prevent_close = True
     page.window.on_event = handle_window_event
@@ -137,7 +187,8 @@ def main(page: ft.Page):
             repo.git.add(".")
             repo.git.commit("-m", "Change news")
             repo.git.push("-u", "origin", "main")
-        except:
+        except (git.InvalidGitRepositoryError, git.GitError, git.GitCmdObjectDB, git.GitDB) as e:
+            print(e)
             flet_toast.error(
                 page=page,
                 message="Erro ao conectar no github",
@@ -210,12 +261,9 @@ def main(page: ft.Page):
         title=ft.Text("Carregando conteúdo..."),
         content=ft.Container(height = 50, alignment=ft.Alignment(0,0.5), content=ft.ProgressRing(width=30, height=30, stroke_width = 3))
     )
-
+    
     def trySend(e):
-        user = e.control.parent.content.controls[0].value
-        password = e.control.parent.content.controls[1].value
         saveYes(e, False)
-
         insertLogin_dialog.open = False
         sendingContent.open = True
         sendingContent.modal = True
@@ -229,7 +277,7 @@ def main(page: ft.Page):
         remote_path = "/usr/share/nginx/html"
 
         transport = paramiko.Transport(('172.22.161.213', 22))
-        transport.connect(username=user, password=password)
+        transport.connect(username=currentAuth.user, password=currentAuth.password)
         sftp = MySFTPClient.from_transport(transport)
         sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
         sftp.close()
@@ -245,29 +293,10 @@ def main(page: ft.Page):
 
         sendingContent.open = False
         page.update()
-        
 
-    def closeLogin(e):
-        page.close(insertLogin_dialog)
-
-    insertLogin_dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Row([
-            ft.Text("Insira seus dados do servidor"),
-            ft.IconButton(icon=ft.Icons.CLOSE, on_click=closeLogin)
-            ]),
-        content=ft.Column([
-            ft.TextField(label="Usuario"),
-            ft.TextField(label="Senha", password=True)
-        ], height=100),
-        actions=[
-            ft.ElevatedButton("Enviar", on_click=trySend),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
 
     def sendData(e):
-        insertLogin_dialog.open = True
+        trySend(e)
         page.update()
     
     #endregion

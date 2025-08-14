@@ -5,6 +5,13 @@ import pandas as pd
 
 class ConnectDB():
     def __init__(self, user, password):
+
+        if(user=="" and password==""):
+            self.mock = True
+            return
+        
+        self.mock = False
+
         server = SSHTunnelForwarder(
             ('172.22.161.213', 22),
             ssh_username=user,
@@ -34,6 +41,8 @@ class ConnectDB():
             sys.exit(1)
 
     def GetAllData(self):
+        if self.mock == True: return
+
         self.cur.execute("SELECT count(*) FROM pubsLEMBio")
         count = self.cur.fetchone()[0]
         batch_size = 1 # whatever
@@ -55,9 +64,13 @@ class ConnectDB():
         return df
 
     def ExcuteQuery(self, query):
+        if self.mock == True: return
+
         self.cur.execute(query)
         self.conn.commit()
 
     def CloseConnection(self):
+        if self.mock == True: return
+
         self.conn.close()
         self.server.stop()
