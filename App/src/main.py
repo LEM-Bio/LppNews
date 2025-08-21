@@ -1,7 +1,8 @@
 import flet as ft
+import sys
 import json
 from copy import deepcopy
-from flet_toast import flet_toast
+from flet_toast import flet_toast #TODO: FIX FLET_TOAST FLET VERSION (<0.25.1)
 import os
 import uploadImgur as uploadImgur
 import git
@@ -22,6 +23,10 @@ import artigos
 import databaseConn as db
 import pandas as pd
 from login import LogInfo as login
+
+def restart_script():
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -63,24 +68,33 @@ def main(page: ft.Page):
     page.window.min_height = 300
     page.window.min_width = 450
 
+    def route_change(route):
+        if page.route == "/":
+            page.views.clear()
+            page.views.append(logApp(page))
+        elif page.route == "/main":
+            page.views.clear()
+            page.views.append(mainApp(page))
+        page.update()
+
+    page.on_route_change = route_change
+    page.go("/")
+
+def logApp(page: ft.Page):
     def LogIn(e):
         currentAuth.user = e.control.parent.content.controls[0].value
         currentAuth.password = e.control.parent.content.controls[1].value
+        insertLogin_dialog.content.controls[0].read_only = True
+        insertLogin_dialog.content.controls[1].read_only = True
+        page.update()
         if currentAuth.checkValidation(): 
+            currentAuth.logged = True
             #Connect to Database
             global conn
             conn = db.ConnectDB(user=currentAuth.user, password=currentAuth.password)
             global database
             database = conn.GetAllData()
-            global art
-            art = artigos.Artigo(page, database)
-
-            for i in range(len(database)):
-                artigo = database.iloc[i].to_dict()
-                art.controls.append( art.getArtigo(artigo) )
-
-            page.update()
-            page.close(insertLogin_dialog)
+            page.go("/main")
         else:
             flet_toast.error(
                 page=page,
@@ -89,14 +103,19 @@ def main(page: ft.Page):
                 duration=3
             )
 
+            insertLogin_dialog.content.controls[0].read_only = False
+            insertLogin_dialog.content.controls[1].read_only = False
+            page.update()
+
     insertLogin_dialog = ft.AlertDialog(
         modal=True,
         title=ft.Row([
             ft.Text("Insira seus dados do servidor"),
             ]),
         content=ft.Column([
-            ft.TextField(label="Usuario"),
-            ft.TextField(label="Senha", password=True)
+            ft.TextField(label="Host (IP do servidor)", read_only=False, value="172.22.161.213"), #TODO: Change to a list of ips checking the website connection in the network
+            ft.TextField(label="Usuario", read_only=False),
+            ft.TextField(label="Senha", password=True, can_reveal_password=True, read_only=False)
         ], height=100),
         actions=[
             ft.ElevatedButton("Enviar", on_click=LogIn),
@@ -106,40 +125,67 @@ def main(page: ft.Page):
 
     insertLogin_dialog.open = True #Ask login when start
 
-    global dataNewsOriginal
-    global dataNews
+    return ft.View(
+        "/",
+        controls=[
+            insertLogin_dialog
+        ],
+    )
 
-    #DEFINIR O QUE APARECE NA TELA
-    file_picker = ft.FilePicker()
-    page.overlay.append(file_picker)
-    page.update()
-
-    lv = nt.Noticia(page, dataNews, file_picker)
-    pb = publi.Publicacao(page, dataNews, file_picker)
-    equip = eqp.Equipamento(page, dataNews, file_picker)
-    crdn = coord.Coordenador(page, dataNews, file_picker)
-    docnt = doc.Docente(page, dataNews, file_picker)
-    eqpTec = tec.Equipe(page, dataNews, file_picker)
-    estud = est.Estudante(page, dataNews, file_picker)
-    cmt = com.Comite(page, dataNews, file_picker)
-
-    global art
-    art = artigos.Artigo(page, database)
+def mainApp(page: ft.Page):
+    #region Send Content
+    sendingContent = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Carregando conteúdo..."),
+        content=ft.Container(height = 50, alignment=ft.Alignment(0,0.5), content=ft.ProgressRing(width=30, height=30, stroke_width = 3))
+    )
     
-    botoes = ft.ResponsiveRow()
-    botoesPB = ft.ResponsiveRow()
-    botoesEqp = ft.ResponsiveRow()
-    botoesEquipe = ft.ResponsiveRow()
-    botoesArt = ft.ResponsiveRow()
+    def trySend(e):
+        sendingContent.open = True
+        sendingContent.modal = True
+        page.update()
+
+        print(f'{paginaPath}{os.sep}package.json')
+        pkg = npm.NPMPackage(f'{paginaPath}{os.sep}package.json')
+        pkg.install()
+        pkg.run_script('build', '--report')
+
+        remote_path = "/usr/share/nginx/html"
+
+        transport = paramiko.Transport((currentAuth.host, 22))
+        transport.connect(username=currentAuth.user, password=currentAuth.password)
+        sftp = MySFTPClient.from_transport(transport)
+        sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
+        sftp.close()
+
+        try:
+            for index, row in database.iterrows():
+                print(row)
+                sql = f'UPDATE pubsLEMBio SET id = {row["id"]}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}" where id = {index+1}'
+                print(sql)
+                conn.ExcuteQuery(sql)
+        except:
+            pass
+
+        sendingContent.open = False
+        saveYes(e, False)
+        page.update()
+
+
+    def sendData(e):
+        trySend(e)
+        page.update()
     
+    #endregion
+
     #region Exit PopUp
 
     #FECHAR JSON ANTES DE FECHAR APP
     def handle_window_event(e):
-        if e.data == "close" and sendingContent.open == False and insertLogin_dialog.open == False:
+        if e.data == "close" and sendingContent.open == False:
             confirm_dialog.open = True
             page.update()
-        elif e.data == "close" and insertLogin_dialog.open == True:
+        elif e.data == "close":
             handle_yes(e)
 
     page.window.prevent_close = True
@@ -170,6 +216,30 @@ def main(page: ft.Page):
 
     #endregion
 
+    global dataNewsOriginal
+    global dataNews
+
+    #DEFINIR O QUE APARECE NA TELA
+    file_picker = ft.FilePicker()
+    page.overlay.append(file_picker)
+    page.update()
+
+    lv = nt.Noticia(page, dataNews, file_picker)
+    pb = publi.Publicacao(page, dataNews, file_picker)
+    equip = eqp.Equipamento(page, dataNews, file_picker)
+    crdn = coord.Coordenador(page, dataNews, file_picker)
+    docnt = doc.Docente(page, dataNews, file_picker)
+    eqpTec = tec.Equipe(page, dataNews, file_picker)
+    estud = est.Estudante(page, dataNews, file_picker)
+    cmt = com.Comite(page, dataNews, file_picker)
+    art = artigos.Artigo(page, database)
+    
+    botoes = ft.ResponsiveRow()
+    botoesPB = ft.ResponsiveRow()
+    botoesEqp = ft.ResponsiveRow()
+    botoesEquipe = ft.ResponsiveRow()
+    botoesArt = ft.ResponsiveRow()
+
     #region Save PopUp
 
     def saveYes(e, closeDiag = True):
@@ -187,11 +257,10 @@ def main(page: ft.Page):
             repo.git.add(".")
             repo.git.commit("-m", "Change news")
             repo.git.push("-u", "origin", "main")
-        except (git.InvalidGitRepositoryError, git.GitError, git.GitCmdObjectDB, git.GitDB) as e:
-            print(e)
-            flet_toast.error(
+        except:
+            flet_toast.warning(
                 page=page,
-                message="Erro ao conectar no github",
+                message="Erro ao enviar ao github",
                 position="top_right",
                 duration=3
             )
@@ -253,52 +322,6 @@ def main(page: ft.Page):
         confirmDiscard_dialog.open = True
         page.update()
 
-    #endregion
-    
-    #region Send Content
-    sendingContent = ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Carregando conteúdo..."),
-        content=ft.Container(height = 50, alignment=ft.Alignment(0,0.5), content=ft.ProgressRing(width=30, height=30, stroke_width = 3))
-    )
-    
-    def trySend(e):
-        saveYes(e, False)
-        insertLogin_dialog.open = False
-        sendingContent.open = True
-        sendingContent.modal = True
-        page.update()
-
-        print(f'{paginaPath}{os.sep}package.json')
-        pkg = npm.NPMPackage(f'{paginaPath}{os.sep}package.json')
-        pkg.install()
-        pkg.run_script('build', '--report')
-
-        remote_path = "/usr/share/nginx/html"
-
-        transport = paramiko.Transport(('172.22.161.213', 22))
-        transport.connect(username=currentAuth.user, password=currentAuth.password)
-        sftp = MySFTPClient.from_transport(transport)
-        sftp.put_dir(os.path.join(f"{paginaPath}", "build"), remote_path)
-        sftp.close()
-
-        try:
-            for index, row in database.iterrows():
-                print(row)
-                sql = f'UPDATE pubsLEMBio SET id = {row["id"]}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}" where id = {index+1}'
-                print(sql)
-                conn.ExcuteQuery(sql)
-        except:
-            pass
-
-        sendingContent.open = False
-        page.update()
-
-
-    def sendData(e):
-        trySend(e)
-        page.update()
-    
     #endregion
 
     #region Definindo os botoes de salvamento, descarte, adiçao de noticias e envio ao servidor
@@ -371,6 +394,7 @@ def main(page: ft.Page):
                     )
                 ],
                 alignment="CENTER",
+                visible=True
             )
     )
 
@@ -560,9 +584,12 @@ def main(page: ft.Page):
         expand=1,
     )
     
-    page.add(tabs, confirm_dialog, confirmSave_dialog, insertLogin_dialog, confirmDiscard_dialog, sendingContent)
-
-    page.update()
+    return ft.View(
+        "/main",
+        controls=[
+            tabs, confirm_dialog, confirmSave_dialog, confirmDiscard_dialog, sendingContent
+        ],
+    )
 
 
 ft.app(

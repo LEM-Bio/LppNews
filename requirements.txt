@@ -7,3 +7,4 @@ scp==0.15.*
 pandas
 sshtunnel
 mariadb
+setuptools
