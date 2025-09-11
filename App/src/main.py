@@ -2,31 +2,27 @@ import flet as ft
 import sys
 import json
 from copy import deepcopy
-from flet_toast import flet_toast #TODO: FIX FLET_TOAST FLET VERSION (<0.25.1)
+from utils.toast import *
 import os
-import uploadImgur as uploadImgur
+import utils.uploadImgur as uploadImgur
 import git
 import shutil
 import config as config
 import pynpm as npm
 import paramiko
-from connection import MySFTPClient
-import noticias as nt
-import publicacoes as publi
-import equipamentos as eqp
-import coordenadores as coord
-import docentes as doc
-import equipe as tec
-import estudantes as est
-import comite as com
-import artigos
-import databaseConn as db
+from setup.connection import MySFTPClient
+import webComponents.noticias as nt
+import webComponents.publicacoes as publi
+import webComponents.equipamentos as eqp
+import webComponents.coordenadores as coord
+import webComponents.docentes as doc
+import webComponents.equipe as tec
+import webComponents.estudantes as est
+import webComponents.comite as com
+import webComponents.artigos as artigos
+import setup.databaseConn as db
 import pandas as pd
-from login import LogInfo as login
-
-def restart_script():
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
+from setup.login import LogInfo as login
 
 output = os.getcwd()
 paginaPath = os.path.join(f'{output}', 'LembioWebsite')
@@ -41,7 +37,7 @@ repo.config_writer().set_value("user", "name", "pedroand6").release()
 repo.config_writer().set_value("user", "email", "redbrickcar2@gmail.com").release()
 repo.git.remote("set-url", "origin", f"https://{config.secret_token}@github.com/LEM-Bio/LembioWebsite.git")
 
-currentAuth = login("", "")
+currentAuth = login("", "", "")
 
 #Carrega os dados
 jsonPath = os.path.join(f'{output}', 'LembioWebsite', 'src', 'data', 'components-mock.json')
@@ -81,11 +77,19 @@ def main(page: ft.Page):
     page.go("/")
 
 def logApp(page: ft.Page):
+    toast_manager = Toaster(page, expand=False, position=ToastPosition.TOP_RIGHT)
+
     def LogIn(e):
-        currentAuth.user = e.control.parent.content.controls[0].value
-        currentAuth.password = e.control.parent.content.controls[1].value
-        insertLogin_dialog.content.controls[0].read_only = True
-        insertLogin_dialog.content.controls[1].read_only = True
+        hostField = e.control.parent.content.controls[0]
+        userField = e.control.parent.content.controls[1]
+        passField = e.control.parent.content.controls[2]
+
+        currentAuth.host = hostField.value
+        currentAuth.user = userField.value
+        currentAuth.password = passField.value
+        hostField.read_only = True
+        userField.read_only = True
+        passField.read_only = True
         page.update()
         if currentAuth.checkValidation(): 
             currentAuth.logged = True
@@ -94,17 +98,18 @@ def logApp(page: ft.Page):
             conn = db.ConnectDB(user=currentAuth.user, password=currentAuth.password)
             global database
             database = conn.GetAllData()
+            global databaseLen
+            databaseLen = database.shape[0]
             page.go("/main")
         else:
-            flet_toast.error(
-                page=page,
-                message="Usuario ou senha incorretos",
-                position="top_right",
-                duration=3
-            )
+            toast_manager.show_toast(
+                toast_type=ToastType.ERROR,
+                text="Usuario ou senha incorretos",
+            ),
 
-            insertLogin_dialog.content.controls[0].read_only = False
-            insertLogin_dialog.content.controls[1].read_only = False
+            hostField.read_only = False
+            userField.read_only = False
+            passField.read_only = False
             page.update()
 
     insertLogin_dialog = ft.AlertDialog(
@@ -116,7 +121,7 @@ def logApp(page: ft.Page):
             ft.TextField(label="Host (IP do servidor)", read_only=False, value="172.22.161.213"), #TODO: Change to a list of ips checking the website connection in the network
             ft.TextField(label="Usuario", read_only=False),
             ft.TextField(label="Senha", password=True, can_reveal_password=True, read_only=False)
-        ], height=100),
+        ], height=200),
         actions=[
             ft.ElevatedButton("Enviar", on_click=LogIn),
         ],
@@ -133,6 +138,8 @@ def logApp(page: ft.Page):
     )
 
 def mainApp(page: ft.Page):
+    toast_manager = Toaster(page, expand=False, position=ToastPosition.TOP_RIGHT)
+
     #region Send Content
     sendingContent = ft.AlertDialog(
         modal=True,
@@ -141,11 +148,11 @@ def mainApp(page: ft.Page):
     )
     
     def trySend(e):
+        page.window.prevent_close = True
         sendingContent.open = True
         sendingContent.modal = True
         page.update()
 
-        print(f'{paginaPath}{os.sep}package.json')
         pkg = npm.NPMPackage(f'{paginaPath}{os.sep}package.json')
         pkg.install()
         pkg.run_script('build', '--report')
@@ -159,22 +166,53 @@ def mainApp(page: ft.Page):
         sftp.close()
 
         try:
+            global databaseLen
+            newDataLen = database.shape[0]
+
+            print(f"antigo: {databaseLen}")
+            print(f"novo: {newDataLen}")
+
+            count = 0
             for index, row in database.iterrows():
-                print(row)
-                sql = f'UPDATE pubsLEMBio SET id = {row["id"]}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}" where id = {index+1}'
-                print(sql)
+                sql = f'UPDATE pubsLEMBio SET id = {count+1}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}" where id = {count+1}'
                 conn.ExcuteQuery(sql)
-        except:
-            pass
+                count += 1
+            
+            if newDataLen > databaseLen:
+                for index, row in database.iloc[databaseLen: newDataLen].iterrows():
+                    sql = f'INSERT INTO pubsLEMBio SET id = {row["id"]}, ano = {row["ano"]}, texto = "{row["texto"]}", link = "{row["link"]}"'
+                    conn.ExcuteQuery(sql)
+            elif newDataLen < databaseLen:
+                for i in range(databaseLen - newDataLen):
+                    print(databaseLen + i)
+                    sql = f'DELETE FROM pubsLEMBio WHERE id = {databaseLen + i}'
+                    conn.ExcuteQuery(sql)
+        except Exception as err:
+            print(err)
 
         sendingContent.open = False
+        page.window.prevent_close = False
         saveYes(e, False)
         page.update()
 
+    def sendNo(e):
+        page.close(confirmSend_dialog)
+
+    confirmSend_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Por favor confirme"),
+        content=ft.Text("Voce realmente quer enviar os dados?"),
+        actions=[
+            ft.ElevatedButton("Sim", on_click=trySend),
+            ft.OutlinedButton("Nao", on_click=sendNo),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
 
     def sendData(e):
-        trySend(e)
-        page.update()
+        confirmSend_dialog.open = True
+        e.page.open(confirmSend_dialog)
+        e.page.update()
     
     #endregion
 
@@ -184,6 +222,8 @@ def mainApp(page: ft.Page):
     def handle_window_event(e):
         if e.data == "close" and sendingContent.open == False:
             confirm_dialog.open = True
+            page.update()
+        elif e.data == "close" and sendingContent.open == True:
             page.update()
         elif e.data == "close":
             handle_yes(e)
@@ -258,16 +298,14 @@ def mainApp(page: ft.Page):
             repo.git.commit("-m", "Change news")
             repo.git.push("-u", "origin", "main")
         except:
-            flet_toast.warning(
-                page=page,
-                message="Erro ao enviar ao github",
-                position="top_right",
-                duration=3
-            )
+            toast_manager.show_toast(
+                toast_type=ToastType.WARNING,
+                text="Erro ao enviar ao github",
+            ),
         
         if closeDiag:
             page.close(confirmSave_dialog)
-        lv.newsReset()
+        lv.componentReset()
         pb.pbsReset()
 
     def saveNo(e):
@@ -296,10 +334,10 @@ def mainApp(page: ft.Page):
         dataNews = {}
         dataNews = deepcopy(dataNewsOriginal)
         
-        lv.dataNews = dataNews
+        lv.data = dataNews
         pb.dataNews = dataNews
         
-        lv.newsReset()
+        lv.componentReset()
         pb.pbsReset()
         
         page.close(confirmDiscard_dialog)
@@ -333,7 +371,7 @@ def mainApp(page: ft.Page):
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar noticia",
-                        on_click=lv.addNot
+                        on_click=lv.addContent
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
@@ -406,7 +444,7 @@ def mainApp(page: ft.Page):
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar artigo",
-                        on_click=art.addArtigo
+                        on_click=art.addContent
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
@@ -472,7 +510,7 @@ def mainApp(page: ft.Page):
 
     for i in range(len(dataNews['noticias'])):
         noticia = dataNews['noticias'][i]
-        lv.controls.append( lv.getNoticia(noticia) )
+        lv.controls.append( lv.getContent(noticia) )
 
     for i in range(len(dataNews['publicados'])):
         publicacao = dataNews['publicados'][i]
@@ -504,7 +542,7 @@ def mainApp(page: ft.Page):
 
     for i in range(len(database)):
         artigo = database.iloc[i].to_dict()
-        art.controls.append( art.getArtigo(artigo) )
+        art.controls.append( art.getContent(artigo) )
 
     tabs = ft.Tabs(
         selected_index=0,

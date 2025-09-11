@@ -1,7 +1,6 @@
 import flet as ft
-from flet_toast import flet_toast
 
-class Equipe(ft.ListView):
+class Comite(ft.ListView):
     def __init__(self, page: ft.Page, datanews, file_picker):
         super().__init__()
         self.page: ft.Page = page
@@ -18,9 +17,9 @@ class Equipe(ft.ListView):
         
     def getCoord(self, coord):
         return ft.Draggable(
-                group="Tecnicos",
+                group="Comite de Usuarios",
                 content=ft.DragTarget(
-                    group="Tecnicos",
+                    group="Comite de Usuarios",
                     content=ft.ExpansionTile(
                         title = ft.Row(
                                         [
@@ -29,7 +28,7 @@ class Equipe(ft.ListView):
                                                 icon=ft.Icons.INDETERMINATE_CHECK_BOX,
                                                 icon_color="blue400",
                                                 icon_size=30,
-                                                tooltip="Remover tecnico",
+                                                tooltip="Remover usuario",
                                                 on_click=self.removeCoord,
                                                 width=100,
                                             ),
@@ -46,7 +45,7 @@ class Equipe(ft.ListView):
                                                 width=600, 
                                                 ),
                                             ft.ListTile(
-                                                title=ft.TextField(coord['dep'], on_change=lambda e: self.changeCoord(e, column='dep'), label="Departamento"),
+                                                title=ft.TextField(coord['posicao'], on_change=lambda e: self.changeCoord(e, column='posicao'), label="Posicao"),
                                                 width=600, 
                                                 ),
                                         ],
@@ -57,6 +56,10 @@ class Equipe(ft.ListView):
                                         [
                                             ft.ListTile(
                                                 title=ft.TextField(coord['curriculo'], on_change=lambda e: self.changeCoord(e, column='curriculo'), label="Curriculo"),
+                                                width=600, 
+                                                ),
+                                            ft.ListTile(
+                                                title=ft.TextField(coord['dep'], on_change=lambda e: self.changeCoord(e, column='dep'), label="Departamento"),
                                                 width=600, 
                                                 ),
                                             ft.ListTile(
@@ -82,8 +85,8 @@ class Equipe(ft.ListView):
 
     def coordReset(self):
         self.controls.clear()
-        for i in range(len(self.dataNews['eqTecnica'])):
-            coordenador = self.dataNews['eqTecnica'][i]
+        for i in range(len(self.dataNews['comite'])):
+            coordenador = self.dataNews['comite'][i]
             self.controls.append( self.getCoord(coordenador) )
             
         self.page.update()
@@ -92,19 +95,13 @@ class Equipe(ft.ListView):
         novoCoord = {
                 "name": "",
                 "curriculo": "",
+                "posicao": "",
                 "dep": "",
                 "uni": ""
             }
 
-        self.dataNews['eqTecnica'].insert(0, novoCoord)
+        self.dataNews['comite'].insert(0, novoCoord)
         self.coordReset()
-        
-        flet_toast.sucess(
-            page=self.page,
-            message="Novo tecnico adicionado",
-            position="top_right",
-            duration=3
-        )
 
     def changeCoord(self, e, column, imageCol=''):
         if imageCol == '':
@@ -115,24 +112,18 @@ class Equipe(ft.ListView):
         if len(self.controls) > index:
             dataToChange = str(e).split("data='")[1][0:-2]
             if imageCol == '':
-                self.dataNews['eqTecnica'][index][column] = dataToChange
+                self.dataNews['comite'][index][column] = dataToChange
                 return
                 
-            self.dataNews['eqTecnica'][index][column][imageCol] = dataToChange
+            self.dataNews['comite'][index][column][imageCol] = dataToChange
 
     def removeCoord(self, e):
         coordenador = e.control.parent.parent.parent.parent
         index = self.controls.index(coordenador)
         self.controls.remove(coordenador)
-        self.dataNews['eqTecnica'].pop(index)
+        self.dataNews['comite'].pop(index)
 
         self.coordReset()
-        flet_toast.sucess(
-            page=self.page,
-            message="Tecnico removido",
-            position="top_right",
-            duration=3
-        )
 
     def drag_accept(self, e):
         # get draggable (source) control by its ID
@@ -142,18 +133,11 @@ class Equipe(ft.ListView):
 
         indexSent = self.controls.index(src)
         indexGot = self.controls.index(e.control.parent)
-        self.dataNews['eqTecnica'][indexSent], self.dataNews['eqTecnica'][indexGot] = self.dataNews['eqTecnica'][indexGot], self.dataNews['eqTecnica'][indexSent]
+        self.dataNews['comite'][indexSent], self.dataNews['comite'][indexGot] = self.dataNews['comite'][indexGot], self.dataNews['comite'][indexSent]
 
         # reset border
         e.control.content.color = None
         self.coordReset()
-
-        flet_toast.sucess(
-            page=self.page,
-            message="Ordem atualizada",
-            position="top_right",
-            duration=3
-        )
 
         self.page.update()
 

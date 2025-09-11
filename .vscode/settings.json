@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./App/src/WebComponents",
+        "./App/src/webComponents"
+    ]
+}

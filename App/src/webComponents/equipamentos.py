@@ -1,8 +1,7 @@
 import flet as ft
-from flet_toast import flet_toast
-import uploadImgur as uploadImgur
+import utils.uploadImgur as uploadImgur
 
-class Publicacao(ft.ListView):
+class Equipamento(ft.ListView):
     def __init__(self, page: ft.Page, datanews, file_picker):
         super().__init__()
         self.page: ft.Page = page
@@ -17,21 +16,21 @@ class Publicacao(ft.ListView):
 
         self.page.update()
         
-    def getPubli(self, pub):
+    def getEquip(self, equip):
         return ft.Draggable(
-                group="Publicação",
+                group="Equipamento",
                 content=ft.DragTarget(
-                    group="Publicação",
+                    group="Equipamento",
                     content=ft.ExpansionTile(
                         title = ft.Row(
                                         [
-                                            ft.Text(pub["title"], text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                            ft.Text(equip["cardTitle"], text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                                             ft.IconButton(
                                                 icon=ft.Icons.INDETERMINATE_CHECK_BOX,
                                                 icon_color="blue400",
                                                 icon_size=30,
-                                                tooltip="Remover publicação",
-                                                on_click=self.removePub,
+                                                tooltip="Remover equipamento",
+                                                on_click=self.removeEquip,
                                                 width=100,
                                             ),
                                         ],
@@ -42,13 +41,13 @@ class Publicacao(ft.ListView):
                                 [
                                     ft.Column(
                                                 [
-                                                    ft.TextField(pub["image"]["url"], label="Url da imagem", on_change=lambda e: self.changePub(e, column='image', imageCol='url'), width=600),
+                                                    ft.TextField(equip["image"]["url"], label="Url da imagem", on_change=lambda e: self.changeEquip(e, column='image', imageCol='url'), width=600),
                                                     ft.Image(
-                                                                src=pub["image"]["url"],
+                                                                src=equip["image"]["url"],
                                                                 width=500,
                                                             ),
                                                     ft.ElevatedButton("Escolher uma imagem...", on_click=lambda e: self.pickFiles(e)),
-                                                    ft.TextField(pub["image"]["alt"], width=600, height=100, on_change=lambda e: self.changePub(e, column='image', imageCol='alt'), label="Alt da imagem")
+                                                    ft.TextField(equip["image"]["alt"], width=600, height=100, on_change=lambda e: self.changeEquip(e, column='image', imageCol='alt'), label="Alt da imagem")
                                                 ],
                                                 alignment=ft.MainAxisAlignment.START,
                                                 horizontal_alignment = ft.CrossAxisAlignment.CENTER,
@@ -56,22 +55,17 @@ class Publicacao(ft.ListView):
                                     ft.Column(
                                         [
                                             ft.ListTile(
-                                                title=ft.TextField(pub['title'], on_change=lambda e: self.changePub(e, column='title'), label="Título"),
+                                                title=ft.TextField(equip['cardTitle'], on_change=lambda e: self.changeEquip(e, column='cardTitle'), label="Título do Card"),
                                                 width=600, 
                                                 ),
                                             ft.ListTile(
-                                                title=ft.TextField(pub['publishDate'], on_change=lambda e: self.changePub(e, column='publishDate'), label="Data"), 
-                                                dense=True,
+                                                title=ft.TextField(equip['title'], on_change=lambda e: self.changeEquip(e, column='title'), label="Título"),
                                                 width=600, 
                                                 ),
                                             ft.ListTile(
-                                                title=ft.TextField(pub["content"], multiline=True, on_change=lambda e: self.changePub(e, column='content'), label="Conteúdo"),
+                                                title=ft.TextField(equip["content"], multiline=True, on_change=lambda e: self.changeEquip(e, column='content'), label="Conteúdo"),
                                                 width=600, 
-                                            ),
-                                            ft.ListTile(
-                                                title=ft.TextField(pub["link"], on_change=lambda e: self.changePub(e, column='link'), label="Link da publicação"),
-                                                width=600, 
-                                            ),
+                                            )
                                         ],
                                         alignment=ft.MainAxisAlignment.START,
                                         horizontal_alignment = ft.CrossAxisAlignment.CENTER,
@@ -86,40 +80,32 @@ class Publicacao(ft.ListView):
                     on_will_accept=self.drag_will_accept,
                     on_leave=self.drag_leave,
                 ),
-                content_feedback=ft.Text(pub["title"], text_align=ft.TextAlign.CENTER, size=23, color=ft.Colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
+                content_feedback=ft.Text(equip["cardTitle"], text_align=ft.TextAlign.CENTER, size=23, color=ft.Colors.WHITE, weight=ft.FontWeight.NORMAL, spans=[], font_family="Consolas")
             )
 
-    def pbsReset(self):
+    def equipReset(self):
         self.controls.clear()
-        for i in range(len(self.dataNews['publicados'])):
-            publicacao = self.dataNews['publicados'][i]
-            self.controls.append( self.getPubli(publicacao) )
+        for i in range(len(self.dataNews['equipamentos'])):
+            equipamento = self.dataNews['equipamentos'][i]
+            self.controls.append( self.getEquip(equipamento) )
             
         self.page.update()
 
-    def addPub(self, e):
-        novaPub = {
+    def addEquip(self, e):
+        novoEquip = {
                 "title": "",
+                "cardTitle": "",
                 "content": "",
                 "image": {
                     "url": "",
                     "alt": ""
-                },
-                "publishDate": "",
-                "link": ""
+                }
             }
 
-        self.dataNews['publicados'].insert(0, novaPub)
-        self.pbsReset()
-        
-        flet_toast.sucess(
-            page=self.page,
-            message="Nova publicação adicionada",
-            position="top_right",
-            duration=3
-        )
+        self.dataNews['equipamentos'].insert(0, novoEquip)
+        self.equipReset()
 
-    def changePub(self, e, column, imageCol=''):
+    def changeEquip(self, e, column, imageCol=''):
         if imageCol == '':
             index = self.controls.index(e.control.parent.parent.parent.parent.parent.parent.parent)
         else:
@@ -128,24 +114,18 @@ class Publicacao(ft.ListView):
         if len(self.controls) > index:
             dataToChange = str(e).split("data='")[1][0:-2]
             if imageCol == '':
-                self.dataNews['publicados'][index][column] = dataToChange
+                self.dataNews['equipamentos'][index][column] = dataToChange
                 return
                 
-            self.dataNews['publicados'][index][column][imageCol] = dataToChange
+            self.dataNews['equipamentos'][index][column][imageCol] = dataToChange
 
-    def removePub(self, e):
-        publicacao = e.control.parent.parent.parent.parent
-        index = self.controls.index(publicacao)
-        self.controls.remove(publicacao)
-        self.dataNews['publicados'].pop(index)
+    def removeEquip(self, e):
+        equipamento = e.control.parent.parent.parent.parent
+        index = self.controls.index(equipamento)
+        self.controls.remove(equipamento)
+        self.dataNews['equipamentos'].pop(index)
 
-        self.pbsReset()
-        flet_toast.sucess(
-            page=self.page,
-            message="Publicação removida",
-            position="top_right",
-            duration=3
-        )
+        self.equipReset()
 
     def drag_accept(self, e):
         # get draggable (source) control by its ID
@@ -155,18 +135,11 @@ class Publicacao(ft.ListView):
 
         indexSent = self.controls.index(src)
         indexGot = self.controls.index(e.control.parent)
-        self.dataNews['publicados'][indexSent], self.dataNews['publicados'][indexGot] = self.dataNews['publicados'][indexGot], self.dataNews['publicados'][indexSent]
+        self.dataNews['equipamentos'][indexSent], self.dataNews['equipamentos'][indexGot] = self.dataNews['equipamentos'][indexGot], self.dataNews['equipamentos'][indexSent]
 
         # reset border
         e.control.content.color = None
-        self.pbsReset()
-
-        flet_toast.sucess(
-            page=self.page,
-            message="Ordem atualizada",
-            position="top_right",
-            duration=3
-        )
+        self.equipReset()
 
         self.page.update()
 
@@ -187,8 +160,8 @@ class Publicacao(ft.ListView):
         index = self.controls.index(imageTextField.parent.parent.parent.parent.parent.parent)
 
         if len(self.controls) > index:
-            self.dataNews['publicados'][index]['image']['url'] = imgurUrl
-        self.pbsReset()
+            self.dataNews['equipamentos'][index]['image']['url'] = imgurUrl
+        self.equipReset()
 
     def pickFiles(self, e):
         global imageTextField

@@ -1,10 +1,10 @@
-flet==0.27.6
-flet_toast
 requests==2.32.3
 gitpython==3.1.*
 pynpm==0.2.* 
 scp==0.15.*
+flet[all]==0.27.6
 pandas
 sshtunnel
 mariadb
 setuptools
+fletmint
