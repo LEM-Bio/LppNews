@@ -1,0 +1,1 @@
+__all__ = ['artigos', 'equipamentos', 'noticias', 'publicacoes', 'membersComponents']

@@ -1,0 +1,1 @@
+__all__ = ['comite', 'coordenadores', 'docentes', 'equipe', 'estudantes']

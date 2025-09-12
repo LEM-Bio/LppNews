@@ -1,5 +1,6 @@
 import flet as ft
 from webComponents.componentList import WebList
+from webComponents.customTile import CustomTile
 from utils.toast import *
 
 class Artigo(WebList):
@@ -14,7 +15,7 @@ class Artigo(WebList):
         self.page.update()
 
     def getContent(self, content):
-        return ft.ExpansionTile(
+        return CustomTile(
                     title = ft.Row(
                                     [
                                         ft.Text(f'{content["id"]} {content["ano"]} {content["texto"]}', text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),

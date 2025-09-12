@@ -11,15 +11,8 @@ import config as config
 import pynpm as npm
 import paramiko
 from setup.connection import MySFTPClient
-import webComponents.noticias as nt
-import webComponents.publicacoes as publi
-import webComponents.equipamentos as eqp
-import webComponents.coordenadores as coord
-import webComponents.docentes as doc
-import webComponents.equipe as tec
-import webComponents.estudantes as est
-import webComponents.comite as com
-import webComponents.artigos as artigos
+from webComponents import *
+from webComponents.membersComponents import *
 import setup.databaseConn as db
 import pandas as pd
 from setup.login import LogInfo as login
@@ -98,6 +91,9 @@ def logApp(page: ft.Page):
             conn = db.ConnectDB(user=currentAuth.user, password=currentAuth.password)
             global database
             database = conn.GetAllData()
+            global originalDatabase
+            originalDatabase = {}
+            originalDatabase = deepcopy(database)
             global databaseLen
             databaseLen = database.shape[0]
             page.go("/main")
@@ -264,15 +260,17 @@ def mainApp(page: ft.Page):
     page.overlay.append(file_picker)
     page.update()
 
-    lv = nt.Noticia(page, dataNews, file_picker)
-    pb = publi.Publicacao(page, dataNews, file_picker)
-    equip = eqp.Equipamento(page, dataNews, file_picker)
-    crdn = coord.Coordenador(page, dataNews, file_picker)
-    docnt = doc.Docente(page, dataNews, file_picker)
-    eqpTec = tec.Equipe(page, dataNews, file_picker)
-    estud = est.Estudante(page, dataNews, file_picker)
-    cmt = com.Comite(page, dataNews, file_picker)
+    lv = noticias.Noticia(page, dataNews, file_picker)
+    pb = publicacoes.Publicacao(page, dataNews, file_picker)
+    equip = equipamentos.Equipamento(page, dataNews, file_picker)
+    crdn = coordenadores.Coordenador(page, dataNews, file_picker)
+    docnt = docentes.Docente(page, dataNews, file_picker)
+    eqpTec = equipe.Equipe(page, dataNews, file_picker)
+    estud = estudantes.Estudante(page, dataNews, file_picker)
+    cmt = comite.Comite(page, dataNews, file_picker)
     art = artigos.Artigo(page, database)
+
+    components = [lv, pb, equip, crdn, docnt, eqpTec, estud, cmt, art]
     
     botoes = ft.ResponsiveRow()
     botoesPB = ft.ResponsiveRow()
@@ -330,15 +328,18 @@ def mainApp(page: ft.Page):
 
     #region Discard Popup
     def discardYes(e):
+        database = {}
+        database = deepcopy(originalDatabase)
+
         global dataNews
         dataNews = {}
         dataNews = deepcopy(dataNewsOriginal)
         
-        lv.data = dataNews
-        pb.dataNews = dataNews
-        
-        lv.componentReset()
-        pb.pbsReset()
+        for comp in components:
+            comp.data = dataNews
+            comp.componentReset() #FIXME
+
+        art.data = database
         
         page.close(confirmDiscard_dialog)
 
@@ -419,7 +420,7 @@ def mainApp(page: ft.Page):
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar equipamento",
-                        on_click=equip.addEquip
+                        on_click=equip.addContent
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
@@ -479,7 +480,7 @@ def mainApp(page: ft.Page):
         elif equipDrop.value == "Docente": docnt.addCoord(e)
         elif equipDrop.value == "Tecnico": eqpTec.addCoord(e)
         elif equipDrop.value == "Estudante": estud.addCoord(e)
-        elif equipDrop.value == "Usuario": cmt.addCoord(e)
+        elif equipDrop.value == "Usuario": cmt.addContent(e)
 
     botoesEquipe.controls.append(
         ft.Row(
@@ -518,7 +519,7 @@ def mainApp(page: ft.Page):
 
     for i in range(len(dataNews['equipamentos'])):
         equipamento = dataNews['equipamentos'][i]
-        equip.controls.append( equip.getEquip(equipamento) )
+        equip.controls.append( equip.getContent(equipamento) )
 
     for i in range(len(dataNews['coordenadores'])):
         coordenador = dataNews['coordenadores'][i]
@@ -538,7 +539,7 @@ def mainApp(page: ft.Page):
 
     for i in range(len(dataNews['comite'])):
         usuario = dataNews['comite'][i]
-        cmt.controls.append( cmt.getCoord(usuario) )
+        cmt.controls.append( cmt.getContent(usuario) )
 
     for i in range(len(database)):
         artigo = database.iloc[i].to_dict()

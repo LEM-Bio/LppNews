@@ -2,6 +2,8 @@ import abc
 import flet as ft
 from utils.toast import *
 import utils.uploadImgur as uploadImgur
+import pandas as pd
+from copy import deepcopy
 
 class WebList(abc.ABC, ft.ReorderableListView):
     def __init__(self, page: ft.Page, data={}, filepicker=ft.FilePicker(), name="", jsonSkeleton = {}):
@@ -27,10 +29,22 @@ class WebList(abc.ABC, ft.ReorderableListView):
         raise NotImplementedError
 
     def componentReset(self):
+
+        states = [control.expanded for control in self.controls]
+        print(states)
+
         self.controls.clear()
         for i in range(len(self.data[self.name])):
             content = self.data[self.name][i]
-            self.controls.append( self.getContent(content) )
+            newTile = self.getContent(content)
+            
+            if i < len(states): print(states[i])
+            if i < len(states) - 1 and states[i] == True:
+                
+                newTile.initially_expanded = True
+                newTile.expanded = True
+
+            self.controls.append( newTile )
 
         self.page.update()
 
@@ -45,19 +59,22 @@ class WebList(abc.ABC, ft.ReorderableListView):
             text=f"Novo item adicionado"
         )
 
-    def changeData(self, e, column, imageCol=''):
-        if imageCol == '':
-            index = self.controls.index(e.control.parent.parent.parent.parent.parent)
-        else:
-            index = self.controls.index(e.control.parent.parent.parent.parent)
+    def changeData(self, e, column, imageCol='', value='', content = {}):
+        index = self.data[self.name].index(content)
 
         if len(self.controls) > index:
-            dataToChange = str(e).split("data='")[1][0:-2]
+            if value == '':
+                dataToChange = str(e).split("data='")[1][0:-2]
+            else:
+                dataToChange = value
+
             if imageCol == '':
                 self.data[self.name][index][column] = dataToChange
                 return
                 
             self.data[self.name][index][column][imageCol] = dataToChange
+
+        self.componentReset()
 
     def removeContent(self, e):
         content = e.control.parent.parent
