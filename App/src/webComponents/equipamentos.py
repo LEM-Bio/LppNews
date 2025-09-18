@@ -6,7 +6,7 @@ from webComponents.customTile import CustomTile
 class Equipamento(WebList):
     def __init__(self, page: ft.Page, data={}, filepicker=ft.FilePicker()):
         super().__init__(
-            name = "noticias",
+            name = "equipamentos",
             jsonSkeleton = {
                 "title": "",
                 "cardTitle": "",
@@ -24,10 +24,10 @@ class Equipamento(WebList):
         self.page.update()
         
     def getContent(self, content):
-        return CustomTile(
+        tile = CustomTile(
                         title = ft.Row(
                                         [
-                                            ft.Text(content["cardTitle"], text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                            ft.Text(content['cardTitle'], text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                                             ft.IconButton(
                                                 icon=ft.Icons.INDETERMINATE_CHECK_BOX,
                                                 icon_color="blue400",
@@ -79,3 +79,6 @@ class Equipamento(WebList):
                             )
                         )]
                     )
+        
+        tile.on_change = lambda e : self.expandState(e, tile)
+        return tile

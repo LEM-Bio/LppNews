@@ -6,10 +6,4 @@ class CustomTile(ft.ExpansionTile):
 
         self.affinity=ft.TileAffinity.LEADING
         self.expanded = self.initially_expanded
-        self.on_change = self.expand #FIXME
-
-    def expand(self):
-        print("expandiu")
-        print(not self.expanded)
-        self.expanded = not self.expanded
     

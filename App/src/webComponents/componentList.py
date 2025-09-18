@@ -2,8 +2,7 @@ import abc
 import flet as ft
 from utils.toast import *
 import utils.uploadImgur as uploadImgur
-import pandas as pd
-from copy import deepcopy
+from webComponents.customTile import CustomTile
 
 class WebList(abc.ABC, ft.ReorderableListView):
     def __init__(self, page: ft.Page, data={}, filepicker=ft.FilePicker(), name="", jsonSkeleton = {}):
@@ -22,6 +21,8 @@ class WebList(abc.ABC, ft.ReorderableListView):
         self.jsonSkeleton = jsonSkeleton
         self.toast_manager = Toaster(page, expand=False, position=ToastPosition.TOP_RIGHT)
 
+        self.states = [False for i in range(len(data))]
+
         self.page.update()
         
     @abc.abstractmethod
@@ -29,28 +30,23 @@ class WebList(abc.ABC, ft.ReorderableListView):
         raise NotImplementedError
 
     def componentReset(self):
-
-        states = [control.expanded for control in self.controls]
-        print(states)
-
         self.controls.clear()
         for i in range(len(self.data[self.name])):
             content = self.data[self.name][i]
             newTile = self.getContent(content)
-            
-            if i < len(states): print(states[i])
-            if i < len(states) - 1 and states[i] == True:
-                
-                newTile.initially_expanded = True
-                newTile.expanded = True
+
+            newTile.initially_expanded = self.states[i]
+            newTile.expanded = self.states[i]
 
             self.controls.append( newTile )
 
+        self.states = [control.expanded for control in self.controls]
         self.page.update()
 
     def addContent(self, e):
         newContent = self.jsonSkeleton
 
+        self.states.insert(0, False)
         self.data[self.name].insert(0, newContent)
         self.componentReset()
 
@@ -70,16 +66,17 @@ class WebList(abc.ABC, ft.ReorderableListView):
 
             if imageCol == '':
                 self.data[self.name][index][column] = dataToChange
-                return
-                
-            self.data[self.name][index][column][imageCol] = dataToChange
+            else:
+                self.data[self.name][index][column][imageCol] = dataToChange
 
-        self.componentReset()
+        self.componentReset() #FIXME (when typing the field is unselected because of this reset)
+
 
     def removeContent(self, e):
         content = e.control.parent.parent
         index = self.controls.index(content)
         self.controls.remove(content)
+        self.states.pop(index)
         self.data[self.name].pop(index)
 
         self.componentReset()
@@ -89,9 +86,17 @@ class WebList(abc.ABC, ft.ReorderableListView):
         )
 
     def handle_reorder(self, e: ft.OnReorderEvent):
-        self.data[self.name][e.old_index], self.data[self.name][e.new_index] = self.data[self.name][e.new_index], self.data[self.name][e.old_index]
+        direction = (int)((e.new_index - e.old_index) / abs(e.new_index - e.old_index)) #Direction of the reorder (1 descend and -1 for ascend)
+        oldCopy = self.data[self.name][e.old_index].copy()
+        oldState = self.states[e.old_index]
+
+        for i in range(e.old_index, e.new_index, direction):
+            self.data[self.name][i] = self.data[self.name][i+direction]
+            self.states[i] = self.states[i+direction]
+
+        self.data[self.name][e.new_index] = oldCopy
+        self.states[e.new_index] = oldState
         self.componentReset()
-        self.page.update()
 
 
     def on_dialog_result(self, e: ft.FilePickerResultEvent):
@@ -112,3 +117,8 @@ class WebList(abc.ABC, ft.ReorderableListView):
         
         self.filepicker.on_result = self.on_dialog_result
         self.filepicker.pick_files(allow_multiple=False)
+
+    def expandState(self, e, tile):
+        index = self.controls.index(tile)
+        self.states[index] = not tile.expanded
+        tile.expanded = not tile.expanded

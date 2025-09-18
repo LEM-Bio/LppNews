@@ -303,8 +303,9 @@ def mainApp(page: ft.Page):
         
         if closeDiag:
             page.close(confirmSave_dialog)
-        lv.componentReset()
-        pb.pbsReset()
+
+        for component in components:
+            component.componentReset()
 
     def saveNo(e):
         page.close(confirmSave_dialog)
@@ -396,7 +397,7 @@ def mainApp(page: ft.Page):
                         icon_color="blue400",
                         icon_size=40,
                         tooltip="Adicionar publicação",
-                        on_click=pb.addPub
+                        on_click=pb.addContent
                     ),
                     ft.ElevatedButton("Salvar", on_click=saveData, bgcolor="green", color="white"),
                     ft.ElevatedButton("Descartar", on_click=discardData, bgcolor="red", color="white"),
@@ -476,10 +477,10 @@ def mainApp(page: ft.Page):
                     )
     
     def addEquipe(e):
-        if equipDrop.value == "Coordenador": crdn.addCoord(e)
-        elif equipDrop.value == "Docente": docnt.addCoord(e)
-        elif equipDrop.value == "Tecnico": eqpTec.addCoord(e)
-        elif equipDrop.value == "Estudante": estud.addCoord(e)
+        if equipDrop.value == "Coordenador": crdn.addContent(e)
+        elif equipDrop.value == "Docente": docnt.addContent(e)
+        elif equipDrop.value == "Tecnico": eqpTec.addContent(e)
+        elif equipDrop.value == "Estudante": estud.addContent(e)
         elif equipDrop.value == "Usuario": cmt.addContent(e)
 
     botoesEquipe.controls.append(
@@ -515,7 +516,7 @@ def mainApp(page: ft.Page):
 
     for i in range(len(dataNews['publicados'])):
         publicacao = dataNews['publicados'][i]
-        pb.controls.append( pb.getPubli(publicacao) )
+        pb.controls.append( pb.getContent(publicacao) )
 
     for i in range(len(dataNews['equipamentos'])):
         equipamento = dataNews['equipamentos'][i]
@@ -523,19 +524,19 @@ def mainApp(page: ft.Page):
 
     for i in range(len(dataNews['coordenadores'])):
         coordenador = dataNews['coordenadores'][i]
-        crdn.controls.append( crdn.getCoord(coordenador) )
+        crdn.controls.append( crdn.getContent(coordenador) )
 
     for i in range(len(dataNews['docentes'])):
         docente = dataNews['docentes'][i]
-        docnt.controls.append( docnt.getCoord(docente) )
+        docnt.controls.append( docnt.getContent(docente) )
 
     for i in range(len(dataNews['eqTecnica'])):
         tecnico = dataNews['eqTecnica'][i]
-        eqpTec.controls.append( eqpTec.getCoord(tecnico) )
+        eqpTec.controls.append( eqpTec.getContent(tecnico) )
 
     for i in range(len(dataNews['estudantes'])):
         estudante = dataNews['estudantes'][i]
-        estud.controls.append( estud.getCoord(estudante) )
+        estud.controls.append( estud.getContent(estudante) )
 
     for i in range(len(dataNews['comite'])):
         usuario = dataNews['comite'][i]

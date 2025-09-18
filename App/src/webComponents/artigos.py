@@ -15,7 +15,7 @@ class Artigo(WebList):
         self.page.update()
 
     def getContent(self, content):
-        return CustomTile(
+        tile = CustomTile(
                     title = ft.Row(
                                     [
                                         ft.Text(f'{content["id"]} {content["ano"]} {content["texto"]}', text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
@@ -63,6 +63,8 @@ class Artigo(WebList):
                         )
                     )]
                 )
+        tile.on_change = lambda e : self.expandState(e, tile)
+        return tile
     
     def componentReset(self):
         self.controls.clear()

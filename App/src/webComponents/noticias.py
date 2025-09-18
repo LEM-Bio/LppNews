@@ -25,7 +25,7 @@ class Noticia(WebList):
         self.page.update()
         
     def getContent(self, content):
-        return CustomTile(
+        tile = CustomTile(
                     title = ft.Row(
                                     [
                                         ft.Text(content["title"], text_align=ft.TextAlign.LEFT, size=23, width=self.page.width*0.6, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
@@ -102,3 +102,6 @@ class Noticia(WebList):
                         )
                     )]
                 )
+        
+        tile.on_change = lambda e : self.expandState(e, tile)
+        return tile
