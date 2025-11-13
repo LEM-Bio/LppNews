@@ -1,0 +1,12 @@
+requests==2.32.3
+gitpython==3.1.*
+pynpm==0.2.* 
+scp==0.15.*
+flet[all]==0.28.3
+pandas
+sshtunnel
+mariadb
+setuptools
+fletmint
+paramiko==3.5.*
+pyinstaller
